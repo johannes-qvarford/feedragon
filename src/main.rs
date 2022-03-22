@@ -1,3 +1,5 @@
+mod parsing;
+
 fn main() -> Result<(), xmltree::ParseError> {
     use xmltree::Element;
     // use std::fs::File;
