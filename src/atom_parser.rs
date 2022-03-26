@@ -20,6 +20,11 @@ fn child_elements<'a>(tree: &'a Element, name: &str)
         .collect()
 }
 
+fn get_child<'a>(atom_entry: &'a Element, id: &str) -> Result<&'a Element, ParsingError> {
+    atom_entry.get_child((id, "http://www.w3.org/2005/Atom"))
+        .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element '{}' for {:?}", id, atom_entry)))
+}
+
 impl Parser for AtomParser {
     fn parse_feed(&self, tree: Element) -> Result<Feed, ParsingError> {
 
@@ -64,10 +69,7 @@ mod parser_tests {
 impl AtomParser {
     fn parse_entry(&self, atom_entry: Element) -> Result<Entry, ParsingError> {
 
-        let get_child = |id: &str| {
-            atom_entry.get_child((id, "http://www.w3.org/2005/Atom"))
-                .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing entry element '{}' for {:?}", id, atom_entry)))
-        };
+        let get_child = |id: &_| get_child(&atom_entry, id);
 
         let extract_text = |id: &str| -> Result<String, ParsingError> {
             let child = get_child(id)?;
