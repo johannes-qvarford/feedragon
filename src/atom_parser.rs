@@ -21,7 +21,10 @@ fn child_elements<'a>(tree: &'a Element, name: &str)
 
 trait Elementy {
     fn element(&self, id: &str) -> Result<&Element, ParsingError>;
+    fn elements(&self, id: &str) -> Vec<&Element>;
     fn text(&self) -> Result<String, ParsingError>;
+    fn has_attribute_with_value(&self, name: &str, value: &str) -> bool;
+    
 }
 
 impl Elementy for Element {
@@ -30,11 +33,36 @@ impl Elementy for Element {
         .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element '{}' for {:?}", id, self)))
     }
 
+    fn elements(&self, id: &str) -> Vec<&Element> {
+        self.children
+            .iter()
+            .filter_map(|e| match e {
+                XMLNode::Element(elem) => Some(elem),
+                _ => None,
+            })
+            .filter(|e| id.match_element(e))
+            .collect()
+    }
+
     fn text(&self) -> Result<String, ParsingError> {
         let text = self.get_text()
             .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing text from entry element {:?}", self)))?
             .to_string();
         Ok(text)
+    }
+
+    fn has_attribute_with_value(&self, name: &str, value: &str) -> bool {
+        self.attributes.get(name).map_or(false, |r| r == value)
+    }
+}
+
+trait ElementyOption {
+    fn into_parsing_result(&self, err_str: &str) -> Result<&Element, ParsingError>;
+}
+
+impl ElementyOption for Option<&Element> {
+    fn into_parsing_result(&self, err_str: &str) -> Result<&Element, ParsingError> {
+        self.ok_or_else(|| { ParsingError::InvalidXmlStructure(format!("Missing element : {}", err_str).into()) })
     }
 }
 
@@ -43,10 +71,12 @@ impl Parser for AtomParser {
         Ok(Feed {
             author_name: "Unknown".into(),
             entries: vec![],
-            id: tree.element("title")?.text().unwrap().to_string(),
-            link: child_elements(&tree, "link")
+            id: tree.element("title")?.text()?,
+            link: tree.elements("link")
                 .iter()
-                .find(|e| e.attributes.get("rel").map_or(false, |r| r == "self")).unwrap()
+                .find(|e| e.has_attribute_with_value("rel", "self"))
+                .map(|e| *e)
+                .into_parsing_result("Missing <link ref='self'> element")?
                 .attributes.get("href").unwrap()
                 .as_str().try_into().unwrap(),
             title: tree.get_child("title").unwrap().get_text().unwrap().to_string()
