@@ -2,7 +2,6 @@ use crate::parsing::*;
 use xmltree::Element;
 use xmltree::XMLNode;
 use xmltree::ElementPredicate;
-use std::ops::Deref;
 use std::convert::TryInto;
 use url::Url;
 
@@ -10,15 +9,7 @@ pub struct ValueContext<T>(T, String);
 
 pub struct ErrorContext<'a, T>(&'a T, String);
 
-pub type ElementContext<'a> = ErrorContext<'a, Element>;
-
-impl <'a> Deref for ElementContext<'a> {
-    type Target = &'a Element;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
+pub type ElementContext<'a> = ValueContext<&'a Element>;
 
 type ElementResult<'a> = Result<ElementContext<'a>, ParsingError>;
 
@@ -26,6 +17,13 @@ impl <'a, T> From<&'a T> for ErrorContext<'a, T>
 {
     fn from(e: &'a T) -> Self {
         ErrorContext(e, "".into())
+    }
+}
+
+impl <T> From<T> for ValueContext<T>
+{
+    fn from(e: T) -> Self {
+        ValueContext(e, "".into())
     }
 }
 
@@ -64,6 +62,11 @@ impl <T> ValueContext<T> {
         format!("'{}' Context:\n{}", s, self.context())
     }
 
+    fn extend<'a, A>(&'a self, mut other: ValueContext<A>) -> ValueContext<A> {
+        other.1 = format!("{}\n{}", other.context(), self.context());
+        other
+    }
+
     fn with_value<U>(self, value: U) -> ValueContext<U> {
         ValueContext(value, self.1)
     }
@@ -74,14 +77,15 @@ impl <T> ValueContext<T> {
 }
 
 impl ElementContext<'_> {
-    pub fn element(&self, id: &str) -> ElementResult {
-         self.get_child((id, "http://www.w3.org/2005/Atom"))
-            .map(|c| ErrorContext(c, self.1.clone()).with_more_context(&format!("In element '{}'", id)))
+    pub fn element<'a>(&'a self, id: &str) -> ElementResult<'a> {
+        let child = self.0.get_child((id, "http://www.w3.org/2005/Atom"));
+        child
+            .map(|c| self.extend(ValueContext(c, format!("In element '{}'", id))))
             .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element '{}'. Context:\n{}", id, self.1)))
     }
 
     pub fn elements(&self, id: &str) -> ValueContext<Vec<&Element>> {
-        let items = self.children
+        let items = self.0.children
             .iter()
             .filter_map(|e| match e {
                 XMLNode::Element(elem) => Some(elem),
@@ -93,14 +97,14 @@ impl ElementContext<'_> {
     }
 
     pub fn text(&self) -> Result<ValueContext<std::borrow::Cow<str>>, ParsingError> {
-        let text = self.get_text()
+        let text = self.0.get_text()
             .map(|e| ValueContext(e, self.1.clone()).with_more_context("In text".into()))
             .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing text. Context:\n{}", self.1)))?;
         Ok(text)
     }
 
     pub fn attribute(&self, name: &str) -> Result<ErrorContext<String>, ParsingError> {
-        self.attributes.get(name)
+        self.0.attributes.get(name)
             .map(|s| ErrorContext(s, self.1.clone()).with_more_context(&format!("In attribute {}", s)))
             .ok_or_else(||
                 ParsingError::InvalidXmlStructure(format!(
@@ -135,8 +139,8 @@ impl ValueContext<Vec<&Element>> {
 }
 
 impl ValueContext<Option<&Element>> {
-    pub fn into_parsing_result(&self) -> Result<ErrorContext<Element>, ParsingError> {
+    pub fn into_parsing_result(&self) -> Result<ElementContext, ParsingError> {
         self.0.ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element. Context:\n{}", self.1)))
-            .map(|e| ErrorContext(e, self.1.clone()))
+            .map(|e| self.extend(ValueContext::from(e)))
     }
 }
