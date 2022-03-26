@@ -6,7 +6,6 @@ Project Description
 
 ### Todo
 
-- [ ] Simplified atom feed for invidious  
 - [ ] Simplified atom feed for nitter  
 - [ ] Combine multiple atom feeds  
 - [ ] Generate atom feed from category list from file  
@@ -19,6 +18,7 @@ Project Description
 
 ### In Progress
 
+- [ ] Simplified atom feed for invidious  
 
 ### Done ✓
 
