@@ -36,10 +36,6 @@ impl <T> ValueContext<T> {
         other
     }
 
-    fn with_value<U>(self, value: U) -> ValueContext<U> {
-        ValueContext(value, self.1)
-    }
-
     fn with_more_context(self, context: &str) -> Self {
         ValueContext(self.0, format!("{}\n{}", context, self.1))
     }
@@ -62,19 +58,19 @@ impl ElementContext<'_> {
             })
             .filter(|e| id.match_element(e))
             .collect();
-        ValueContext(items, self.1.clone()).with_more_context(&format!("In elements '{}'", id))
+        self.extend(ValueContext(items, format!("In elements '{}'", id)))
     }
 
     pub fn text(&self) -> Result<ValueContext<std::borrow::Cow<str>>, ParsingError> {
         let text = self.0.get_text()
-            .map(|e| ValueContext(e, self.1.clone()).with_more_context("In text".into()))
+            .map(|e| self.extend(ValueContext(e, "In text".into())))
             .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing text. Context:\n{}", self.1)))?;
         Ok(text)
     }
 
     pub fn attribute(&self, name: &str) -> Result<ValueContext<&String>, ParsingError> {
         self.0.attributes.get(name)
-            .map(|s| ValueContext(s, self.1.clone()).with_more_context(&format!("In attribute {}", s)))
+            .map(|s| self.extend(ValueContext(s, format!("In attribute {}", s))))
             .ok_or_else(||
                 ParsingError::InvalidXmlStructure(format!(
                     "Missing attribute '{}'. Context:\n{}",
@@ -102,8 +98,7 @@ impl ValueContext<Vec<&Element>> {
                 .iter()
                 .find(|e| has_attribute_with_value(e, name, value))
                 .map(|e| *e);
-
-        ValueContext(item, self.1.clone()).with_more_context(&format!("With attribute {}={}", name, value))
+        self.extend(ValueContext(item, format!("With attribute {}={}", name, value)))
     }
 }
 
