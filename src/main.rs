@@ -1,5 +1,6 @@
 mod parsing;
 mod atom_parser;
+mod xml_tree;
 
 fn main() -> Result<(), xmltree::ParseError> {
     use xmltree::Element;
