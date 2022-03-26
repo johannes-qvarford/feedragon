@@ -1,12 +1,63 @@
 use crate::parsing::*;
 use xmltree::Element;
+use xmltree::XMLNode;
+use xmltree::ElementPredicate;
 use chrono::prelude::*;
+use url::Url;
 
 struct AtomParser;
 
+fn child_elements<'a>(tree: &'a Element, name: &str)
+    -> Vec<& 'a Element>
+    {
+    tree.children
+        .iter()
+        .filter_map(|e| match e {
+            XMLNode::Element(elem) => Some(elem),
+            _ => None,
+        })
+        .filter(|e| name.match_element(e))
+        .collect()
+}
+
 impl Parser for AtomParser {
-    fn parse_feed(tree: Element) -> Result<Feed, ParsingError> {
-        unimplemented!()
+    fn parse_feed(&self, tree: Element) -> Result<Feed, ParsingError> {
+
+        Ok(Feed {
+            author_name: "Unknown".into(),
+            entries: vec![],
+            id: tree.get_child("title").unwrap().get_text().unwrap().to_string(),
+            link: child_elements(&tree, "link")
+                .iter()
+                .find(|e| e.attributes.get("rel").map_or(false, |r| r == "self")).unwrap()
+                .attributes.get("href").unwrap()
+                .as_str().try_into().unwrap(),
+            title: tree.get_child("title").unwrap().get_text().unwrap().to_string()
+        })
+    }
+}
+
+#[cfg(test)]
+mod parser_tests {
+    use super::*;
+
+    #[test]
+    fn feed_with_no_entries_can_be_parsed() {
+        let feed_str = std::fs::read_to_string("src/example_empty_atom_feed.xml")
+            .expect("Expected example file to exist.");
+        let feed_element = Element::parse(feed_str.as_bytes()).unwrap();
+        let parser = AtomParser{};
+        
+        let feed = parser.parse_feed(feed_element);
+
+        let expected = Feed {
+            author_name: "Unknown".into(),
+            entries: vec![],
+            id: "Example feed".into(),
+            link: "https://invidious.privacy.qvarford.net/feed/private?token=something".try_into().unwrap(),
+            title: "Example feed".into()
+        };
+        assert_eq!(Ok(expected), feed);
     }
 }
 

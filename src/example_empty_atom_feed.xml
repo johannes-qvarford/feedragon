@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom" xml:lang="en-US">
+  <link type="text/html" rel="alternate" href="https://invidious.privacy.qvarford.net/feed/subscriptions"/>
+  <link type="application/atom+xml" rel="self" href="https://invidious.privacy.qvarford.net/feed/private?token=something"/>
+  <title>Example feed</title>
+</feed>

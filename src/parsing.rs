@@ -11,13 +11,13 @@ pub struct Entry {
     pub summary: String
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Feed {
-    title: String,
-    link: Url,
-    updated: DateTime<Utc>,
-    author_name: String,
-    id: String,
-    entries: Vec<Entry>
+    pub title: String,
+    pub link: Url,
+    pub author_name: String,
+    pub id: String,
+    pub entries: Vec<Entry>
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -26,5 +26,5 @@ pub enum ParsingError {
 }
 
 pub trait Parser {
-    fn parse_feed(tree: Element) -> Result<Feed, ParsingError>;
+    fn parse_feed(&self, tree: Element) -> Result<Feed, ParsingError>;
 }
