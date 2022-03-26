@@ -24,7 +24,7 @@ trait Elementy {
     fn elements(&self, id: &str) -> Vec<&Element>;
     fn text(&self) -> Result<String, ParsingError>;
     fn has_attribute_with_value(&self, name: &str, value: &str) -> bool;
-    
+    fn attribute(&self, name: &str) -> Result<&str, ParsingError>;
 }
 
 impl Elementy for Element {
@@ -54,6 +54,15 @@ impl Elementy for Element {
     fn has_attribute_with_value(&self, name: &str, value: &str) -> bool {
         self.attributes.get(name).map_or(false, |r| r == value)
     }
+
+    fn attribute(&self, name: &str) -> Result<&str, ParsingError> {
+        self.attributes.get(name)
+            .map(|s| s.as_str())
+            .ok_or_else(||
+                ParsingError::InvalidXmlStructure(format!(
+                    "Missing attribute '{}'",
+                    name)))
+    }
 }
 
 trait ElementyOption {
@@ -77,9 +86,9 @@ impl Parser for AtomParser {
                 .find(|e| e.has_attribute_with_value("rel", "self"))
                 .map(|e| *e)
                 .into_parsing_result("Missing <link ref='self'> element")?
-                .attributes.get("href").unwrap()
-                .as_str().try_into().unwrap(),
-            title: tree.get_child("title").unwrap().get_text().unwrap().to_string()
+                .attribute("href")?
+                .try_into().map_err(|e| ParsingError::InvalidXmlStructure(format!("Invalid <link ref='self' href='X'> element: {}", e)))?,
+            title: tree.element("title")?.text()?.to_string()
         })
     }
 }
@@ -110,9 +119,7 @@ mod parser_tests {
 
 impl AtomParser {
     fn parse_entry(&self, atom_entry: Element) -> Result<Entry, ParsingError> {
-        let extract_text = |id: &str| -> Result<String, ParsingError> {
-            atom_entry.element(id)?.text()
-        };
+        let extract_text = |id: &_| atom_entry.element(id)?.text();
 
         let extract_attribute = |id: &str, attribute_name: &str| -> Result<String, ParsingError> {
             let child = atom_entry.element(id)?;
@@ -142,9 +149,7 @@ impl AtomParser {
             id: extract_text("id")?,
             link: extract_attribute("link", "href")?,
             summary: extract_text("title")?,
-            // 2022-03-22T07:00:09+00:00
             updated: extract_date_time("updated")?
-            //DateTime::from_utc(NaiveDate::from_ymd(2022, 3, 22).and_hms(7, 0, 0), Utc{}),
         })
     }
 }
@@ -168,7 +173,6 @@ mod entry_tests {
             id: String::from("yt:video:be8ZARHsjmc"),
             link: "http://invidious.privacy.qvarford.net/watch?v=be8ZARHsjmc".parse().unwrap(),
             summary: String::from("SmallAnt makes a ✨𝘧𝘳𝘪𝘦𝘯𝘥✨"),
-            // 2022-03-22T07:00:09+00:00
             updated: DateTime::parse_from_rfc3339("2022-03-22T07:26:01+00:00").unwrap().into(),
         };
         assert_eq!(expected, entry);
