@@ -20,13 +20,21 @@ fn child_elements<'a>(tree: &'a Element, name: &str)
 }
 
 trait Elementy {
-    fn child(&self, id: &str) -> Result<&Element, ParsingError>;
+    fn element(&self, id: &str) -> Result<&Element, ParsingError>;
+    fn text(&self) -> Result<String, ParsingError>;
 }
 
 impl Elementy for Element {
-    fn child(&self, id: &str) -> Result<&Element, ParsingError> {
+    fn element(&self, id: &str) -> Result<&Element, ParsingError> {
         self.get_child((id, "http://www.w3.org/2005/Atom"))
         .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element '{}' for {:?}", id, self)))
+    }
+
+    fn text(&self) -> Result<String, ParsingError> {
+        let text = self.get_text()
+            .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing text from entry element {:?}", self)))?
+            .to_string();
+        Ok(text)
     }
 }
 
@@ -35,7 +43,7 @@ impl Parser for AtomParser {
         Ok(Feed {
             author_name: "Unknown".into(),
             entries: vec![],
-            id: tree.child("title").unwrap().get_text().unwrap().to_string(),
+            id: tree.element("title")?.text().unwrap().to_string(),
             link: child_elements(&tree, "link")
                 .iter()
                 .find(|e| e.attributes.get("rel").map_or(false, |r| r == "self")).unwrap()
@@ -73,15 +81,11 @@ mod parser_tests {
 impl AtomParser {
     fn parse_entry(&self, atom_entry: Element) -> Result<Entry, ParsingError> {
         let extract_text = |id: &str| -> Result<String, ParsingError> {
-            let child = atom_entry.child(id)?;
-            let text = child.get_text()
-                .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing text from entry element {:?}", atom_entry)))?
-                .to_string();
-            Ok(text)
+            atom_entry.element(id)?.text()
         };
 
         let extract_attribute = |id: &str, attribute_name: &str| -> Result<String, ParsingError> {
-            let child = atom_entry.child(id)?;
+            let child = atom_entry.element(id)?;
             let value = child.attributes.get(attribute_name)
                 .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing atribute '{}' from element '{}' in entry {:?}", attribute_name, id, atom_entry)))?
                 .clone();
@@ -96,7 +100,7 @@ impl AtomParser {
         // Also, make error messages add context.
         // Maybe that reqires get_child to call text, that calls date_time, passing each as a callback argument.
         let extract_date_time = |id: &str| -> Result<DateTime<Utc>, ParsingError> {
-            let text = extract_text(id)?;
+            let text = atom_entry.element(id)?.text()?;
             let date_time_with_offset = DateTime::parse_from_rfc3339(&text)
                 .map_err(|_dt_err| ParsingError::InvalidXmlStructure(
                     format!("Invalid rfc 3339 date time '{}' from element '{}' in entry element {:?}", text, id, atom_entry)))?;
