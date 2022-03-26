@@ -20,7 +20,7 @@ pub struct Feed {
     entries: Vec<Entry>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ParsingError {
     InvalidXmlStructure(String)
 }

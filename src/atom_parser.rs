@@ -62,7 +62,7 @@ impl AtomParser {
 }
 
 #[cfg(test)]
-mod tests {
+mod entry_tests {
     use super::*;
 
     #[test]
@@ -84,5 +84,19 @@ mod tests {
             updated: DateTime::parse_from_rfc3339("2022-03-22T07:26:01+00:00").unwrap().into(),
         };
         assert_eq!(expected, entry);
+    }
+
+    #[test]
+    fn invalid_entry_gives_detailed_error() {
+        let entry_str = std::fs::read_to_string("src/example_atom_entry.xml")
+            .expect("Expected example file to exist.");
+        let mut atom_entry = Element::parse(entry_str.as_bytes()).unwrap();
+        let attr = atom_entry.get_mut_child("link").unwrap().attributes.remove("href");
+        let parser = AtomParser{};
+
+        let entry = parser.parse_entry(atom_entry.clone());
+
+        assert_eq!(Err(ParsingError::InvalidXmlStructure(
+            format!("Missing atribute 'href' from element 'link' in entry {:?}", atom_entry))), entry)
     }
 }
