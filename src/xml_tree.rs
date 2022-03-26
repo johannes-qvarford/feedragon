@@ -7,45 +7,14 @@ use url::Url;
 
 pub struct ValueContext<T>(T, String);
 
-pub struct ErrorContext<'a, T>(&'a T, String);
-
 pub type ElementContext<'a> = ValueContext<&'a Element>;
 
 type ElementResult<'a> = Result<ElementContext<'a>, ParsingError>;
-
-impl <'a, T> From<&'a T> for ErrorContext<'a, T>
-{
-    fn from(e: &'a T) -> Self {
-        ErrorContext(e, "".into())
-    }
-}
 
 impl <T> From<T> for ValueContext<T>
 {
     fn from(e: T) -> Self {
         ValueContext(e, "".into())
-    }
-}
-
-impl <T> ErrorContext<'_, T> {
-    pub fn value(&self) -> &T {
-        self.0
-    }
-
-    pub fn context(&self) -> &str {
-        self.1.as_str()
-    }
-
-    pub fn format_with_context(&self, s: &str)-> String {
-        format!("'{}' Context:\n{}", s, self.context())
-    }
-
-    fn with_value<'a, U>(self, value: &'a U) -> ErrorContext<'a, U> {
-        ErrorContext(value, self.1)
-    }
-
-    fn with_more_context(self, context: &str) -> Self {
-        ErrorContext(self.0, format!("{}\n{}", context, self.1))
     }
 }
 
@@ -103,9 +72,9 @@ impl ElementContext<'_> {
         Ok(text)
     }
 
-    pub fn attribute(&self, name: &str) -> Result<ErrorContext<String>, ParsingError> {
+    pub fn attribute(&self, name: &str) -> Result<ValueContext<&String>, ParsingError> {
         self.0.attributes.get(name)
-            .map(|s| ErrorContext(s, self.1.clone()).with_more_context(&format!("In attribute {}", s)))
+            .map(|s| ValueContext(s, self.1.clone()).with_more_context(&format!("In attribute {}", s)))
             .ok_or_else(||
                 ParsingError::InvalidXmlStructure(format!(
                     "Missing attribute '{}'. Context:\n{}",
@@ -113,7 +82,7 @@ impl ElementContext<'_> {
     }
 }
 
-impl TryInto<Url> for ErrorContext<'_, String> {
+impl TryInto<Url> for ValueContext<&String> {
 
     type Error= ParsingError;
 
