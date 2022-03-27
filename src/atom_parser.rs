@@ -2,6 +2,7 @@ use crate::parsing::*;
 use xmltree::Element;
 use chrono::prelude::*;
 use crate::xml_tree::*;
+use xmltree::XMLNode;
 use std::borrow::Borrow;
 
 struct AtomParser;
@@ -9,9 +10,17 @@ struct AtomParser;
 impl Parser for AtomParser {
     fn parse_feed(&self, tree: Element) -> Result<Feed, ParsingError> {
         let tree: ElementContext = (&tree).into();
+        let entry_results: Vec<Result<Entry, ParsingError>> = tree.elements("entry")
+            .map(|ec| self.parse_entry(&ec)).value_take();
+
+        let mut entries = vec![];
+        for e in entry_results {
+            entries.push(e?);
+        }
+
         Ok(Feed {
             author_name: "Unknown".into(),
-            entries: vec![],
+            entries: entries,
             id: tree.element("title")?.text()?.value_ref().to_string(),
             link: tree.elements("link")
                 .find_with_attribute_value("rel", "self")
@@ -45,11 +54,39 @@ mod parser_tests {
         };
         assert_eq!(Ok(expected), feed);
     }
+
+    #[test]
+    fn feed_with_one_entry_can_be_parsed() {
+        let feed_str = std::fs::read_to_string("src/example_empty_atom_feed.xml")
+            .expect("Expected example file to exist.");
+        let entry_str = std::fs::read_to_string("src/example_atom_entry.xml")
+        .expect("Expected example file to exist.");
+        let mut feed_element = Element::parse(feed_str.as_bytes()).unwrap();
+        let entry_element = Element::parse(entry_str.as_bytes()).unwrap();
+        feed_element.children.push(XMLNode::Element(entry_element));
+        let parser = AtomParser{};
+
+        let feed = parser.parse_feed(feed_element);
+
+        let expected = Feed {
+            author_name: "Unknown".into(),
+            entries: vec![Entry {
+                title: String::from("SmallAnt makes a ✨𝘧𝘳𝘪𝘦𝘯𝘥✨"),
+                id: String::from("yt:video:be8ZARHsjmc"),
+                link: "http://invidious.privacy.qvarford.net/watch?v=be8ZARHsjmc".parse().unwrap(),
+                summary: String::from("SmallAnt makes a ✨𝘧𝘳𝘪𝘦𝘯𝘥✨"),
+                updated: DateTime::parse_from_rfc3339("2022-03-22T07:26:01+00:00").unwrap().into(),
+            }],
+            id: "Example feed".into(),
+            link: "https://invidious.privacy.qvarford.net/feed/private?token=something".try_into().unwrap(),
+            title: "Example feed".into()
+        };
+        assert_eq!(Ok(expected), feed);
+    }
 }
 
 impl AtomParser {
-    fn parse_entry(&self, atom_entry: Element) -> Result<Entry, ParsingError> {
-        let atom_entry: ElementContext = (&atom_entry).into();
+    fn parse_entry(&self, atom_entry: &ElementContext) -> Result<Entry, ParsingError> {
         let extract_text = |id: &str| -> Result<String, ParsingError> {
              Ok(atom_entry.element(id)?.text()?.value_ref().to_string())
         };
@@ -87,7 +124,7 @@ mod entry_tests {
         let atom_entry = Element::parse(entry_str.as_bytes()).unwrap();
         let parser = AtomParser{};
 
-        let entry = parser.parse_entry(atom_entry)
+        let entry = parser.parse_entry(&ElementContext::from(&atom_entry))
             .expect("Expected entry to be valid.");
 
         let expected = Entry {
@@ -108,7 +145,7 @@ mod entry_tests {
         atom_entry.get_mut_child("link").unwrap().attributes.remove("href");
         let parser = AtomParser{};
 
-        let entry = parser.parse_entry(atom_entry.clone());
+        let entry = parser.parse_entry(&ElementContext::from(&atom_entry));
 
         assert_eq!(Err(ParsingError::InvalidXmlStructure(
                 format!("Missing attribute href Context:\nIn element link\n"))),

@@ -2,7 +2,7 @@ use xmltree::Element;
 use url::Url;
 use chrono::prelude::*;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Entry {
     pub title: String,
     pub link: String,
@@ -20,7 +20,7 @@ pub struct Feed {
     pub entries: Vec<Entry>
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum ParsingError {
     InvalidXmlStructure(String)
 }

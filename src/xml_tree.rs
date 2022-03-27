@@ -4,6 +4,7 @@ use xmltree::XMLNode;
 use xmltree::ElementPredicate;
 use std::convert::TryInto;
 use url::Url;
+use std::mem;
 
 pub struct Context<T> {
     value: T,
@@ -32,8 +33,9 @@ impl <T> Context<T> {
         &self.value
     }
 
-    pub fn format_with_context(&self, s: &str) -> String {
-        format!("'{}' Context:\n{}", s, self.context)
+    pub fn value_take(&mut self) -> T
+    where T: Default {
+        mem::take(&mut self.value)
     }
 
     pub fn invalid_xml_structure(&self, s: &str) -> ParsingError {
@@ -67,6 +69,7 @@ impl ElementContext<'_> {
         self.extend(Context::new(items, format!("In elements {}", id)))
     }
 
+
     pub fn text(&self) -> Result<Context<std::borrow::Cow<str>>, ParsingError> {
         let text = self.value.get_text()
             .map(|e| self.extend(Context::new(e, "In text".into())))
@@ -78,6 +81,15 @@ impl ElementContext<'_> {
         self.value.attributes.get(name)
             .map(|s| self.extend(Context::new(s, format!("In attribute {}", s))))
             .ok_or_else(|| self.invalid_xml_structure(&format!("Missing attribute {}", name)))
+    }
+}
+
+impl Context<Vec<&Element>> {
+    pub fn map<'a, T, F>(&'a self, f: F) -> Context<Vec<T>>
+    where F: Fn(ElementContext<'a>) -> T
+    {
+        let val = self.value.iter().map(|e| f(self.extend(ElementContext::new(*e, "Being iterated over".into())))).collect();
+        self.extend(Context::new(val, "".into()))
     }
 }
 
