@@ -62,8 +62,7 @@ impl AtomParser {
             let element = atom_entry.element(id)?;
             let text = element.text()?;
             let date_time_with_offset = DateTime::parse_from_rfc3339(text.value_ref().borrow())
-                .map_err(|_dt_err| ParsingError::InvalidXmlStructure(
-                    text.format_with_context("Invalid rfc 3339 date time")))?;
+                .map_err(|_dt_err| text.invalid_xml_structure("Invalid rfc 3339 date time"))?;
             return Ok(DateTime::from(date_time_with_offset))
         };
 
@@ -112,7 +111,7 @@ mod entry_tests {
         let entry = parser.parse_entry(atom_entry.clone());
 
         assert_eq!(Err(ParsingError::InvalidXmlStructure(
-                format!("Missing attribute 'href'. Context:\nIn element 'link'\n"))),
+                format!("Missing attribute href Context:\nIn element link\n"))),
             entry)
     }
 }

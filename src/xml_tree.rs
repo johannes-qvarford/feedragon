@@ -16,10 +16,6 @@ type ParsingResult<T> = Result<T, ParsingError>;
 
 type ElementResult<'a> = ParsingResult<ElementContext<'a>>;
 
-// TODO:
-// Consider changing Context to a struct.
-// Kee it DRY for manual "Context: " calls.
-
 impl <T> From<T> for Context<T>
 {
     fn from(e: T) -> Self {
@@ -40,6 +36,11 @@ impl <T> Context<T> {
         format!("'{}' Context:\n{}", s, self.context)
     }
 
+    pub fn invalid_xml_structure(&self, s: &str) -> ParsingError {
+        let text = format!("{} Context:\n{}", s, self.context);
+        ParsingError::InvalidXmlStructure(text)
+    }
+
     fn extend<'a, A>(&'a self, mut other: Context<A>) -> Context<A> {
         other.context = format!("{}\n{}", other.context, self.context);
         other
@@ -50,8 +51,8 @@ impl ElementContext<'_> {
     pub fn element<'a>(&'a self, id: &str) -> ElementResult<'a> {
         let child = self.value.get_child((id, "http://www.w3.org/2005/Atom"));
         child
-            .map(|c| self.extend(Context::new(c, format!("In element '{}'", id))))
-            .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element '{}'. Context:\n{}", id, self.context)))
+            .map(|c| self.extend(Context::new(c, format!("In element {}", id))))
+            .ok_or_else(|| self.invalid_xml_structure(&format!("Missing element {}", id)))
     }
 
     pub fn elements(&self, id: &str) -> Context<Vec<&Element>> {
@@ -63,23 +64,20 @@ impl ElementContext<'_> {
             })
             .filter(|e| id.match_element(e))
             .collect();
-        self.extend(Context::new(items, format!("In elements '{}'", id)))
+        self.extend(Context::new(items, format!("In elements {}", id)))
     }
 
     pub fn text(&self) -> Result<Context<std::borrow::Cow<str>>, ParsingError> {
         let text = self.value.get_text()
             .map(|e| self.extend(Context::new(e, "In text".into())))
-            .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing text. Context:\n{}", self.context)))?;
+            .ok_or_else(|| self.invalid_xml_structure("Missing text"))?;
         Ok(text)
     }
 
     pub fn attribute(&self, name: &str) -> Result<Context<&String>, ParsingError> {
         self.value.attributes.get(name)
             .map(|s| self.extend(Context::new(s, format!("In attribute {}", s))))
-            .ok_or_else(||
-                ParsingError::InvalidXmlStructure(format!(
-                    "Missing attribute '{}'. Context:\n{}",
-                    name, self.context)))
+            .ok_or_else(|| self.invalid_xml_structure(&format!("Missing attribute {}", name)))
     }
 }
 
@@ -88,7 +86,7 @@ impl TryInto<Url> for Context<&String> {
     type Error= ParsingError;
 
     fn try_into(self) -> Result<Url, Self::Error> {
-        Url::parse(&self.value).map_err(|err| ParsingError::InvalidXmlStructure(format!("Invalid url: {}. Context:\n{}", err, self.context)))
+        Url::parse(&self.value).map_err(|err| self.invalid_xml_structure(&format!("Invalid url {}", err)))
     }
 }
 
@@ -109,7 +107,7 @@ impl Context<Vec<&Element>> {
 
 impl Context<Option<&Element>> {
     pub fn into_parsing_result(&self) -> Result<ElementContext, ParsingError> {
-        self.value.ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element. Context:\n{}", self.context)))
+        self.value.ok_or_else(|| self.invalid_xml_structure(&format!("Missing element")))
             .map(|e| self.extend(Context::from(e)))
     }
 }
