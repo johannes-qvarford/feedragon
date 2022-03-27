@@ -49,7 +49,7 @@ mod parser_tests {
 
 impl AtomParser {
     fn parse_entry(&self, atom_entry: Element) -> Result<Entry, ParsingError> {
-        let atom_entry: ElementContext = ValueContext::from(&atom_entry);
+        let atom_entry: ElementContext = Context::from(&atom_entry);
         let extract_text = |id: &str| -> Result<String, ParsingError> {
              Ok(atom_entry.element(id)?.text()?.value().to_string())
         };

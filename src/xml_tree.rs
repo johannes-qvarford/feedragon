@@ -5,20 +5,26 @@ use xmltree::ElementPredicate;
 use std::convert::TryInto;
 use url::Url;
 
-pub struct ValueContext<T>(T, String);
+pub struct Context<T>(T, String);
 
-pub type ElementContext<'a> = ValueContext<&'a Element>;
+pub type ElementContext<'a> = Context<&'a Element>;
 
-type ElementResult<'a> = Result<ElementContext<'a>, ParsingError>;
+type ParsingResult<T> = Result<T, ParsingError>;
 
-impl <T> From<T> for ValueContext<T>
+type ElementResult<'a> = ParsingResult<ElementContext<'a>>;
+
+// TODO:
+// Consider changing Context to a struct.
+// Kee it DRY for manual "Context: " calls.
+
+impl <T> From<T> for Context<T>
 {
     fn from(e: T) -> Self {
-        ValueContext(e, "".into())
+        Context(e, "".into())
     }
 }
 
-impl <T> ValueContext<T> {
+impl <T> Context<T> {
     pub fn value(&self) -> &T {
         &self.0
     }
@@ -31,13 +37,9 @@ impl <T> ValueContext<T> {
         format!("'{}' Context:\n{}", s, self.context())
     }
 
-    fn extend<'a, A>(&'a self, mut other: ValueContext<A>) -> ValueContext<A> {
+    fn extend<'a, A>(&'a self, mut other: Context<A>) -> Context<A> {
         other.1 = format!("{}\n{}", other.context(), self.context());
         other
-    }
-
-    fn with_more_context(self, context: &str) -> Self {
-        ValueContext(self.0, format!("{}\n{}", context, self.1))
     }
 }
 
@@ -45,11 +47,11 @@ impl ElementContext<'_> {
     pub fn element<'a>(&'a self, id: &str) -> ElementResult<'a> {
         let child = self.0.get_child((id, "http://www.w3.org/2005/Atom"));
         child
-            .map(|c| self.extend(ValueContext(c, format!("In element '{}'", id))))
+            .map(|c| self.extend(Context(c, format!("In element '{}'", id))))
             .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element '{}'. Context:\n{}", id, self.1)))
     }
 
-    pub fn elements(&self, id: &str) -> ValueContext<Vec<&Element>> {
+    pub fn elements(&self, id: &str) -> Context<Vec<&Element>> {
         let items = self.0.children
             .iter()
             .filter_map(|e| match e {
@@ -58,19 +60,19 @@ impl ElementContext<'_> {
             })
             .filter(|e| id.match_element(e))
             .collect();
-        self.extend(ValueContext(items, format!("In elements '{}'", id)))
+        self.extend(Context(items, format!("In elements '{}'", id)))
     }
 
-    pub fn text(&self) -> Result<ValueContext<std::borrow::Cow<str>>, ParsingError> {
+    pub fn text(&self) -> Result<Context<std::borrow::Cow<str>>, ParsingError> {
         let text = self.0.get_text()
-            .map(|e| self.extend(ValueContext(e, "In text".into())))
+            .map(|e| self.extend(Context(e, "In text".into())))
             .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing text. Context:\n{}", self.1)))?;
         Ok(text)
     }
 
-    pub fn attribute(&self, name: &str) -> Result<ValueContext<&String>, ParsingError> {
+    pub fn attribute(&self, name: &str) -> Result<Context<&String>, ParsingError> {
         self.0.attributes.get(name)
-            .map(|s| self.extend(ValueContext(s, format!("In attribute {}", s))))
+            .map(|s| self.extend(Context(s, format!("In attribute {}", s))))
             .ok_or_else(||
                 ParsingError::InvalidXmlStructure(format!(
                     "Missing attribute '{}'. Context:\n{}",
@@ -78,7 +80,7 @@ impl ElementContext<'_> {
     }
 }
 
-impl TryInto<Url> for ValueContext<&String> {
+impl TryInto<Url> for Context<&String> {
 
     type Error= ParsingError;
 
@@ -87,9 +89,9 @@ impl TryInto<Url> for ValueContext<&String> {
     }
 }
 
-impl ValueContext<Vec<&Element>> {
+impl Context<Vec<&Element>> {
 
-    pub fn find_with_attribute_value(&self, name: &str, value: &str) -> ValueContext<Option<&Element>> {
+    pub fn find_with_attribute_value(&self, name: &str, value: &str) -> Context<Option<&Element>> {
         fn has_attribute_with_value(element: &Element, name: &str, value: &str) -> bool {
             element.attributes.get(name).map_or(false, |r| r == value)
         }
@@ -98,13 +100,13 @@ impl ValueContext<Vec<&Element>> {
                 .iter()
                 .find(|e| has_attribute_with_value(e, name, value))
                 .map(|e| *e);
-        self.extend(ValueContext(item, format!("With attribute {}={}", name, value)))
+        self.extend(Context(item, format!("With attribute {}={}", name, value)))
     }
 }
 
-impl ValueContext<Option<&Element>> {
+impl Context<Option<&Element>> {
     pub fn into_parsing_result(&self) -> Result<ElementContext, ParsingError> {
         self.0.ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element. Context:\n{}", self.1)))
-            .map(|e| self.extend(ValueContext::from(e)))
+            .map(|e| self.extend(Context::from(e)))
     }
 }
