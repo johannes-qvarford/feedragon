@@ -5,7 +5,10 @@ use xmltree::ElementPredicate;
 use std::convert::TryInto;
 use url::Url;
 
-pub struct Context<T>(T, String);
+pub struct Context<T> {
+    value: T,
+    context: String
+}
 
 pub type ElementContext<'a> = Context<&'a Element>;
 
@@ -20,39 +23,39 @@ type ElementResult<'a> = ParsingResult<ElementContext<'a>>;
 impl <T> From<T> for Context<T>
 {
     fn from(e: T) -> Self {
-        Context(e, "".into())
+        Context::new(e, "".into())
     }
 }
 
 impl <T> Context<T> {
-    pub fn value(&self) -> &T {
-        &self.0
+    fn new(value: T, context: String) -> Context<T> {
+        Context{ value: value, context: context }
     }
 
-    pub fn context(&self) -> &str {
-        self.1.as_str()
+    pub fn value_ref(&self) -> &T {
+        &self.value
     }
 
     pub fn format_with_context(&self, s: &str) -> String {
-        format!("'{}' Context:\n{}", s, self.context())
+        format!("'{}' Context:\n{}", s, self.context)
     }
 
     fn extend<'a, A>(&'a self, mut other: Context<A>) -> Context<A> {
-        other.1 = format!("{}\n{}", other.context(), self.context());
+        other.context = format!("{}\n{}", other.context, self.context);
         other
     }
 }
 
 impl ElementContext<'_> {
     pub fn element<'a>(&'a self, id: &str) -> ElementResult<'a> {
-        let child = self.0.get_child((id, "http://www.w3.org/2005/Atom"));
+        let child = self.value.get_child((id, "http://www.w3.org/2005/Atom"));
         child
-            .map(|c| self.extend(Context(c, format!("In element '{}'", id))))
-            .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element '{}'. Context:\n{}", id, self.1)))
+            .map(|c| self.extend(Context::new(c, format!("In element '{}'", id))))
+            .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element '{}'. Context:\n{}", id, self.context)))
     }
 
     pub fn elements(&self, id: &str) -> Context<Vec<&Element>> {
-        let items = self.0.children
+        let items = self.value.children
             .iter()
             .filter_map(|e| match e {
                 XMLNode::Element(elem) => Some(elem),
@@ -60,23 +63,23 @@ impl ElementContext<'_> {
             })
             .filter(|e| id.match_element(e))
             .collect();
-        self.extend(Context(items, format!("In elements '{}'", id)))
+        self.extend(Context::new(items, format!("In elements '{}'", id)))
     }
 
     pub fn text(&self) -> Result<Context<std::borrow::Cow<str>>, ParsingError> {
-        let text = self.0.get_text()
-            .map(|e| self.extend(Context(e, "In text".into())))
-            .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing text. Context:\n{}", self.1)))?;
+        let text = self.value.get_text()
+            .map(|e| self.extend(Context::new(e, "In text".into())))
+            .ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing text. Context:\n{}", self.context)))?;
         Ok(text)
     }
 
     pub fn attribute(&self, name: &str) -> Result<Context<&String>, ParsingError> {
-        self.0.attributes.get(name)
-            .map(|s| self.extend(Context(s, format!("In attribute {}", s))))
+        self.value.attributes.get(name)
+            .map(|s| self.extend(Context::new(s, format!("In attribute {}", s))))
             .ok_or_else(||
                 ParsingError::InvalidXmlStructure(format!(
                     "Missing attribute '{}'. Context:\n{}",
-                    name, self.1)))
+                    name, self.context)))
     }
 }
 
@@ -85,7 +88,7 @@ impl TryInto<Url> for Context<&String> {
     type Error= ParsingError;
 
     fn try_into(self) -> Result<Url, Self::Error> {
-        Url::parse(&self.0).map_err(|err| ParsingError::InvalidXmlStructure(format!("Invalid url: {}. Context:\n{}", err, self.1)))
+        Url::parse(&self.value).map_err(|err| ParsingError::InvalidXmlStructure(format!("Invalid url: {}. Context:\n{}", err, self.context)))
     }
 }
 
@@ -96,17 +99,17 @@ impl Context<Vec<&Element>> {
             element.attributes.get(name).map_or(false, |r| r == value)
         }
 
-        let item = self.0
+        let item = self.value
                 .iter()
                 .find(|e| has_attribute_with_value(e, name, value))
                 .map(|e| *e);
-        self.extend(Context(item, format!("With attribute {}={}", name, value)))
+        self.extend(Context::new(item, format!("With attribute {}={}", name, value)))
     }
 }
 
 impl Context<Option<&Element>> {
     pub fn into_parsing_result(&self) -> Result<ElementContext, ParsingError> {
-        self.0.ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element. Context:\n{}", self.1)))
+        self.value.ok_or_else(|| ParsingError::InvalidXmlStructure(format!("Missing element. Context:\n{}", self.context)))
             .map(|e| self.extend(Context::from(e)))
     }
 }

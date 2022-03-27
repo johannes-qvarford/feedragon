@@ -8,17 +8,17 @@ struct AtomParser;
 
 impl Parser for AtomParser {
     fn parse_feed(&self, tree: Element) -> Result<Feed, ParsingError> {
-        let tree = ElementContext::from(&tree);
+        let tree: ElementContext = (&tree).into();
         Ok(Feed {
             author_name: "Unknown".into(),
             entries: vec![],
-            id: tree.element("title")?.text()?.value().to_string(),
+            id: tree.element("title")?.text()?.value_ref().to_string(),
             link: tree.elements("link")
                 .find_with_attribute_value("rel", "self")
                 .into_parsing_result()?
                 .attribute("href")?
                 .try_into()?,
-            title: tree.element("title")?.text()?.value().to_string()
+            title: tree.element("title")?.text()?.value_ref().to_string()
         })
     }
 }
@@ -49,19 +49,19 @@ mod parser_tests {
 
 impl AtomParser {
     fn parse_entry(&self, atom_entry: Element) -> Result<Entry, ParsingError> {
-        let atom_entry: ElementContext = Context::from(&atom_entry);
+        let atom_entry: ElementContext = (&atom_entry).into();
         let extract_text = |id: &str| -> Result<String, ParsingError> {
-             Ok(atom_entry.element(id)?.text()?.value().to_string())
+             Ok(atom_entry.element(id)?.text()?.value_ref().to_string())
         };
 
         let extract_attribute = |id: &str, attribute_name: &str| -> Result<String, ParsingError> {
-            Ok(atom_entry.element(id)?.attribute(attribute_name)?.value().to_string())
+            Ok(atom_entry.element(id)?.attribute(attribute_name)?.value_ref().to_string())
         };
 
         let extract_date_time = |id: &str| -> Result<DateTime<Utc>, ParsingError> {
             let element = atom_entry.element(id)?;
             let text = element.text()?;
-            let date_time_with_offset = DateTime::parse_from_rfc3339(text.value().borrow())
+            let date_time_with_offset = DateTime::parse_from_rfc3339(text.value_ref().borrow())
                 .map_err(|_dt_err| ParsingError::InvalidXmlStructure(
                     text.format_with_context("Invalid rfc 3339 date time")))?;
             return Ok(DateTime::from(date_time_with_offset))
