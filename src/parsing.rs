@@ -1,6 +1,7 @@
 use xmltree::Element;
 use url::Url;
 use chrono::prelude::*;
+use derive_more::{Display, Error};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Entry {
@@ -20,11 +21,12 @@ pub struct Feed {
     pub entries: Vec<Entry>
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Display)]
 pub enum ParsingError {
     InvalidXmlStructure(String)
 }
 
 pub trait Parser {
     fn parse_feed(&self, tree: Element) -> Result<Feed, ParsingError>;
+    fn serialize_feed(&self, feed: Feed) -> Element;
 }
