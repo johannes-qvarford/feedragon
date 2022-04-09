@@ -100,18 +100,15 @@ mod parser_tests {
     use crate::parsing::Entry;
     use crate::parsing::Feed;
     use chrono::DateTime;
-    use xmltree::Element;
     use super::*;
-    use xmltree::XMLNode;
 
     #[test]
     fn feed_with_no_entries_can_be_parsed() {
         let feed_str = std::fs::read_to_string("src/example_empty_rss_feed.xml")
             .expect("Expected example file to exist.");
-        let feed_element = Element::parse(feed_str.as_bytes()).unwrap();
         let parser = RssParser{};
         
-        let feed = parser.parse_feed(feed_element);
+        let feed = parser.parse_feed_from_bytes(feed_str.as_bytes());
 
         let expected = Feed {
             author_name: "Unknown".into(),
@@ -125,16 +122,11 @@ mod parser_tests {
 
     #[test]
     fn feed_with_one_entry_can_be_parsed() {
-        let feed_str = std::fs::read_to_string("src/example_empty_rss_feed.xml")
+        let feed_str = std::fs::read_to_string("src/example_one_element_rss_feed.xml")
             .expect("Expected example file to exist.");
-        let entry_str = std::fs::read_to_string("src/example_rss_entry.xml")
-        .expect("Expected example file to exist.");
-        let mut feed_element = Element::parse(feed_str.as_bytes()).unwrap();
-        let entry_element = Element::parse(entry_str.as_bytes()).unwrap();
-        feed_element.get_mut_child("channel").unwrap().children.push(XMLNode::Element(entry_element));
         let parser = RssParser{};
 
-        let feed = parser.parse_feed(feed_element);
+        let feed = parser.parse_feed_from_bytes(feed_str.as_bytes());
 
         let expected = Feed {
             author_name: "Unknown".into(),

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom" xml:lang="en-US">
+  <link type="text/html" rel="alternate" href="https://invidious.privacy.qvarford.net/feed/subscriptions"/>
+  <link type="application/atom+xml" rel="self" href="https://invidious.privacy.qvarford.net/feed/private?token=something"/>
+  <title>Example feed</title>
+  <entry>
+    <id>yt:video:be8ZARHsjmc</id>
+    <yt:videoId>be8ZARHsjmc</yt:videoId>
+    <yt:channelId>UCnyP4sbJVIU9JqHz4l6oQZw</yt:channelId>
+    <title>SmallAnt makes a ✨𝘧𝘳𝘪𝘦𝘯𝘥✨</title>
+    <link rel="alternate" href="http://invidious.privacy.qvarford.net/watch?v=be8ZARHsjmc"/>
+    <author>
+      <name>SmallAnt Clips</name>
+      <uri>http://invidious.privacy.qvarford.net/channel/UCnyP4sbJVIU9JqHz4l6oQZw</uri>
+    </author>
+    <content type="xhtml">
+      <div xmlns="http://www.w3.org/1999/xhtml">
+        <a href="http://invidious.privacy.qvarford.net/watch?v=be8ZARHsjmc">
+          <img src="http://invidious.privacy.qvarford.net/vi/be8ZARHsjmc/mqdefault.jpg"/>
+        </a>
+      </div>
+    </content>
+    <published>2022-03-22T07:00:09+00:00</published>
+    <updated>2022-03-22T07:26:01+00:00</updated>
+    <media:group>
+      <media:title>SmallAnt makes a ✨𝘧𝘳𝘪𝘦𝘯𝘥✨</media:title>
+      <media:thumbnail url="http://invidious.privacy.qvarford.net/vi/be8ZARHsjmc/mqdefault.jpg" width="320" height="180"/>
+    </media:group>
+  </entry>
+</feed>

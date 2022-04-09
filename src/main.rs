@@ -5,7 +5,6 @@ mod xml_tree;
 
 #[macro_use] extern crate serde_derive;
 use crate::xml_tree::write_element_to_string;
-use actix_web::web::Buf;
 use actix_web::{get, web, App, HttpServer, Responder};
 use reqwest;
 use std::error::Error;
@@ -30,10 +29,8 @@ async fn atom_proxy(q: web::Query<ProxyQuery>) -> Result<String, Box<dyn Error>>
         .bytes()
         .await?;
 
-    let tree = xmltree::Element::parse(body.reader())?;
-
     let parser = atom_parser::AtomParser{};
-    let feed = parser.parse_feed(tree).map_err(anyhow::Error::msg)?;
+    let feed = parser.parse_feed_from_bytes(body.as_ref()).map_err(anyhow::Error::msg)?;
     let response_tree = feed.serialize();
 
     let response_body = write_element_to_string(&response_tree, &q.proxied)?;
@@ -47,10 +44,8 @@ async fn rss_proxy(q: web::Query<ProxyQuery>) -> Result<String, Box<dyn Error>> 
         .bytes()
         .await?;
 
-    let tree = xmltree::Element::parse(body.reader())?;
-
     let parser = rss_parser::RssParser{};
-    let feed = parser.parse_feed(tree).map_err(anyhow::Error::msg)?;
+    let feed = parser.parse_feed_from_bytes(body.as_ref()).map_err(anyhow::Error::msg)?;
     let response_tree = feed.serialize();
 
     let response_body = write_element_to_string(&response_tree, &q.proxied)?;
