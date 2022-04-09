@@ -4,13 +4,28 @@ mod rss_serialization;
 mod atom;
 
 #[macro_use] extern crate serde_derive;
+use actix_web::ResponseError;
+use anyhow::{Error, Result, Context};
 use crate::rss_serialization::RssDeserializer;
 use crate::atom_serialization::AtomDeserializer;
 use actix_web::{get, web, App, HttpServer, Responder};
 use reqwest;
-use std::error::Error;
 use serialization::FeedDeserializer;
 use anyhow;
+use derive_more::Display;
+
+#[derive(Display, Debug)]
+struct MyError {
+    err: anyhow::Error,
+}
+
+impl ResponseError for MyError {}
+
+impl From<anyhow::Error> for MyError {
+    fn from(err: anyhow::Error) -> MyError {
+        MyError { err }
+    }
+}
 
 #[get("/{id}/{name}/index.html")]
 async fn index(params: web::Path<(u32, String)>) -> impl Responder {
@@ -24,30 +39,34 @@ struct ProxyQuery {
 }
 
 #[get("/feeds/atom-proxy")]
-async fn atom_proxy(q: web::Query<ProxyQuery>) -> Result<String, Box<dyn Error>> {
+async fn atom_proxy(q: web::Query<ProxyQuery>) -> Result<String, MyError> {
     let body = reqwest::get(q.proxied.clone())
-        .await?
+        .await.with_context(|| format!("Failed to fetch atom feed {}", q.proxied.clone()))?
         .bytes()
-        .await?;
+        .await.context("Failed to extract byte request body")?;
 
     let parser = AtomDeserializer{};
-    let feed = parser.parse_feed_from_bytes(body.as_ref()).map_err(anyhow::Error::msg)?;
+    let feed = parser.parse_feed_from_bytes(body.as_ref())
+        .with_context(|| format!("Failed to parse atom feed {}", q.proxied.clone()))?;
 
-    let response_body = feed.serialize_to_string()?;
+    let response_body = feed.serialize_to_string()
+        .with_context(|| format!("Failed to convert parsed atom feed to string {}", q.proxied.clone()))?;
     Ok(response_body)
 }
 
 #[get("/feeds/rss-proxy")]
-async fn rss_proxy(q: web::Query<ProxyQuery>) -> Result<String, Box<dyn Error>> {
+async fn rss_proxy(q: web::Query<ProxyQuery>) -> Result<String, MyError> {
     let body = reqwest::get(q.proxied.clone())
-        .await?
+        .await.with_context(|| format!("Failed to fetch atom feed {}", q.proxied.clone()))?
         .bytes()
-        .await?;
+        .await.context("Failed to extract byte request body")?;
 
     let parser = RssDeserializer{};
-    let feed = parser.parse_feed_from_bytes(body.as_ref()).map_err(anyhow::Error::msg)?;
+    let feed = parser.parse_feed_from_bytes(body.as_ref())
+        .with_context(|| format!("Failed to parse atom feed {}", q.proxied.clone()))?;
 
-    let response_body = feed.serialize_to_string()?;
+    let response_body = feed.serialize_to_string()
+        .with_context(|| format!("Failed to convert parsed atom feed to string {}", q.proxied.clone()))?;
     Ok(response_body)
 }
 

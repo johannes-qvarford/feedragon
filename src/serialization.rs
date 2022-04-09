@@ -1,8 +1,8 @@
-use std::error::Error;
+use anyhow::*;
 use url::Url;
 use chrono::prelude::*;
-use derive_more::{Display};
 use crate::atom::*;
+use anyhow::Result;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Entry {
@@ -22,17 +22,16 @@ pub struct Feed {
     pub entries: Vec<Entry>
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Display)]
-pub enum DeserializationError {
-    InvalidXmlStructure(String)
+pub fn invalid_xml_structure(s: String) -> Error {
+    Error::msg(format!("Invalid xml structure: {}", s))
 }
 
 pub trait FeedDeserializer {
-    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed, DeserializationError>;
+    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed>;
 }
 
 impl Feed {
-    pub fn serialize_to_string(self) -> Result<String, Box<dyn Error>> {
+    pub fn serialize_to_string(self) -> Result<String> {
         let feed = AtomFeed {
             title: self.title,
             links: vec![
@@ -51,6 +50,8 @@ impl Feed {
             .. Default::default()
         };
 
-        Ok(yaserde::ser::to_string_with_config(&feed, &yaserde_cfg)?)
+        Ok(yaserde::ser::to_string_with_config(&feed, &yaserde_cfg)
+            .map_err(Error::msg)
+            .with_context(|| format!("Failed to serialize feed to string: {}", feed.title.clone()))?)
     }
 }

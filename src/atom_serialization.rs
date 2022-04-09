@@ -1,24 +1,26 @@
-use crate::atom_serialization::DeserializationError::InvalidXmlStructure;
 use url::Url;
 use yaserde::de::from_reader;
 use crate::serialization::*;
 use chrono::prelude::*;
 use crate::atom::*;
+use anyhow::{Result, Context};
 
 pub struct AtomDeserializer;
 
 impl FeedDeserializer for AtomDeserializer {
-    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed, DeserializationError> {
-        let mut feed: AtomFeed = from_reader(bytes).map_err(InvalidXmlStructure)?;
+    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed> {
+        let mut feed: AtomFeed = from_reader(bytes).map_err(invalid_xml_structure)?;
 
         let href = &feed.links.iter().find(|li| li.link_type == "application/atom+xml")
-            .ok_or_else(|| InvalidXmlStructure("Could not find self-referencial link in atom feed".into()))?
+            .ok_or_else(|| invalid_xml_structure("Could not find link.type='application/atom+xml' in atom feed".into()))?
             .href;
-        let link = Url::parse(href).map_err(|err| InvalidXmlStructure(format!("Invalid url {}", err)))?;
+        let link = Url::parse(href)
+            .map_err(|err| invalid_xml_structure(format!("Failed to parse 'link.href' in atom feed: {}", err)))?;
 
         let entries = std::mem::replace(&mut feed.entries, vec![]);
-        let entry_results: Vec<Result<Entry, DeserializationError>> = entries.into_iter().map(|ae| {
-            let updated = DateTime::parse_from_rfc3339(&ae.updated).map_err(|e| InvalidXmlStructure(e.to_string()))?;
+        let entry_results: Vec<Result<Entry>> = entries.into_iter().map(|ae| {
+            let updated = DateTime::parse_from_rfc3339(&ae.updated)
+                .map_err(|e| invalid_xml_structure(format!("Failed to parse 'updated' element: {}", e.to_string())))?;
             let e = Entry {
                 id: ae.id,
                 summary: ae.title.clone(),
@@ -30,7 +32,7 @@ impl FeedDeserializer for AtomDeserializer {
         }).collect();
         let mut entries = vec![];
         for e in entry_results {
-            entries.push(e?);
+            entries.push(e.context("Failed to deserialize an atom feed entry")?);
         }
 
         Ok(Feed{
@@ -53,7 +55,7 @@ mod parser_tests {
             .expect("Expected example file to exist.");
         let deserializer = AtomDeserializer{};
         
-        let feed = deserializer.parse_feed_from_bytes(feed_str.as_bytes());
+        let feed = deserializer.parse_feed_from_bytes(feed_str.as_bytes()).unwrap();
         let expected = Feed {
             author_name: "Unknown".into(),
             entries: vec![],
@@ -61,7 +63,7 @@ mod parser_tests {
             link: "https://invidious.privacy.qvarford.net/feed/private?token=something".try_into().unwrap(),
             title: "Example feed".into()
         };
-        assert_eq!(Ok(expected), feed);
+        assert_eq!(expected, feed);
     }
 
     #[test]
@@ -70,7 +72,7 @@ mod parser_tests {
             .expect("Expected example file to exist.");
         let deserializer = AtomDeserializer{};
 
-        let feed = deserializer.parse_feed_from_bytes(feed_str.as_bytes());
+        let feed = deserializer.parse_feed_from_bytes(feed_str.as_bytes()).unwrap();
 
         let expected = Feed {
             author_name: "Unknown".into(),
@@ -85,6 +87,6 @@ mod parser_tests {
             link: "https://invidious.privacy.qvarford.net/feed/private?token=something".try_into().unwrap(),
             title: "Example feed".into()
         };
-        assert_eq!(Ok(expected), feed);
+        assert_eq!(expected, feed);
     }
 }

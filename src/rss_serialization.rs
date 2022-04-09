@@ -1,7 +1,7 @@
+use anyhow::{Result, Context};
+use crate::serialization::invalid_xml_structure;
 use crate::FeedDeserializer;
-use crate::serialization::DeserializationError;
 use crate::serialization::Entry;
-use crate::serialization::DeserializationError::InvalidXmlStructure;
 use crate::serialization::Feed;
 use yaserde::de::from_reader;
 use chrono::DateTime;
@@ -57,18 +57,18 @@ struct Link {
 }
 
 impl FeedDeserializer for RssDeserializer {
-    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed, DeserializationError> {
-        let mut rss: Rss = from_reader(bytes).map_err(InvalidXmlStructure)?;
+    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed> {
+        let mut rss: Rss = from_reader(bytes).map_err(invalid_xml_structure)?;
 
         // Even though we require that the link element should have the atom namespace, the regular rss link element is still included.
         // We therefor have to find the actual atom link.
         let href = &rss.channel.link.iter().find(|li| li.link_type == "application/rss+xml")
-            .ok_or_else(|| InvalidXmlStructure("Could not find self-referencial link in rss feed".into()))?
+            .ok_or_else(|| invalid_xml_structure("Could not find self-referencial link in rss feed".into()))?
             .href;
-        let link = Url::parse(href).map_err(|err| InvalidXmlStructure(format!("Invalid url {}", err)))?;
+        let link = Url::parse(href).map_err(|err| invalid_xml_structure(format!("Invalid url {}", err)))?;
 
         let items = std::mem::replace(&mut rss.channel.items, vec![]);
-        let entry_results: Vec<Result<_, _>> = items.into_iter().map(|it|
+        let entry_results: Vec<Result<Entry>> = items.into_iter().map(|it|
             Ok(Entry {
                 id: it.id,
                 link: it.link,
@@ -76,11 +76,11 @@ impl FeedDeserializer for RssDeserializer {
                 title: it.title,
                 updated:  DateTime::parse_from_rfc2822(&it.updated)
                     .map_err(|_dt_err|
-                    InvalidXmlStructure(format!("Invalid rss date time: {}", _dt_err)))?.into(),
+                        invalid_xml_structure(format!("Invalid rss date time: {}", _dt_err)))?.into(),
         })).collect();
         let mut entries = vec![];
         for e in entry_results {
-            entries.push(e?);
+            entries.push(e.context("Failed to deserialize an atom feed entry")?);
         }
 
         Ok(Feed {
@@ -104,7 +104,7 @@ mod parser_tests {
             .expect("Expected example file to exist.");
         let parser = RssDeserializer{};
         
-        let feed = parser.parse_feed_from_bytes(feed_str.as_bytes());
+        let feed = parser.parse_feed_from_bytes(feed_str.as_bytes()).unwrap();
 
         let expected = Feed {
             author_name: "Unknown".into(),
@@ -113,7 +113,7 @@ mod parser_tests {
             link: "https://nitter.net/HardDriveMag/rss".try_into().unwrap(),
             title: "Hard Drive / @HardDriveMag".into()
         };
-        assert_eq!(Ok(expected), feed);
+        assert_eq!(expected, feed);
     }
 
     #[test]
@@ -122,7 +122,7 @@ mod parser_tests {
             .expect("Expected example file to exist.");
         let parser = RssDeserializer{};
 
-        let feed = parser.parse_feed_from_bytes(feed_str.as_bytes());
+        let feed = parser.parse_feed_from_bytes(feed_str.as_bytes()).unwrap();
 
         let expected = Feed {
             author_name: "Unknown".into(),
@@ -140,6 +140,6 @@ mod parser_tests {
             title: "Hard Drive / @HardDriveMag".into()
         };
 
-        assert_eq!(Ok(expected), feed);
+        assert_eq!(expected, feed);
     }
 }
