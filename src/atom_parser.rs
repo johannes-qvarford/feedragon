@@ -3,53 +3,7 @@ use yaserde::de::from_reader;
 use crate::atom_parser::ParsingError::InvalidXmlStructure;
 use crate::parsing::*;
 use chrono::prelude::*;
-use yaserde_derive::YaDeserialize;
-
-#[derive(YaDeserialize, Default, Debug, PartialEq)]
-#[yaserde(
-    prefix = "ns",
-    namespace = "ns: http://www.w3.org/2005/Atom"
-    root = "feed"
-    rename = "feed"
-)]
-struct AtomFeed {
-    #[yaserde(rename="link", prefix="ns")]
-    links: Vec<Link>,
-    #[yaserde(prefix="ns")]
-    title: String,
-    #[yaserde(rename="entry", prefix="ns")]
-    entries: Vec<AtomEntry>,
-}
-
-#[derive(YaDeserialize, Default, Debug, PartialEq)]
-#[yaserde(
-    prefix = "ns",
-    namespace = "ns: http://www.w3.org/2005/Atom"
-)]
-struct AtomEntry {
-    #[yaserde(prefix="ns")]
-    title: String,
-    #[yaserde(prefix="ns")]
-    id: String,
-    #[yaserde(prefix="ns")]
-    link: Link,
-    #[yaserde(prefix="ns")]
-    updated: String,
-}
-
-#[derive(YaDeserialize, Default, Debug, PartialEq)]
-#[yaserde(
-    prefix = "ns",
-    namespace = "ns: http://www.w3.org/2005/Atom"
-)]
-struct Link {
-    #[yaserde(attribute, prefix="ns")]
-    href: String,
-    #[yaserde(attribute, prefix="ns")]
-    rel: String,
-    #[yaserde(attribute, rename="type", prefix="ns")]
-    r#type: String
-}
+use crate::atom::*;
 
 pub struct AtomParser;
 

@@ -1,11 +1,8 @@
-use std::collections::HashMap;
-use xmltree::XMLNode;
-use std::collections::BTreeMap;
-use xmltree::Namespace;
-use xmltree::Element;
+use std::error::Error;
 use url::Url;
 use chrono::prelude::*;
 use derive_more::{Display};
+use crate::atom::*;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Entry {
@@ -35,70 +32,25 @@ pub trait Parser {
 }
 
 impl Feed {
-    pub fn serialize(mut self) -> Element {
-        let mut feed_children = vec![
-            Feed::text_element("id".into(), std::mem::replace(&mut self.id, String::new())),
-            Feed::link(&self.link.as_str()),
-        ];
-        let entries = std::mem::replace(&mut self.entries, vec![]);
-        feed_children.append(&mut Feed::serialize_entries(entries));
-        let root = Element {
-            name: "feed".into(),
-            // xmlns="http://www.w3.org/2005/Atom" xml:lang="en-US"
-            namespaces: Some(Namespace(BTreeMap::from([
-                ("".into(), "http://www.w3.org/2005/Atom".into())
-            ]))),
-            namespace: Some("http://www.w3.org/2005/Atom".into()),
-            prefix: None,
-            attributes: [("xml:lang".into(), "en-US".into())].into(),
-            children: feed_children
+    pub fn serialize_to_string(mut self) -> Result<String, Box<dyn Error>> {
+        let feed = AtomFeed {
+            title: self.title,
+            links: vec![
+                Link { r#type: "application/atom+xml".into(), rel: "self".into(), href: self.link.as_str().into() }
+            ],
+            entries: self.entries.into_iter().map(|e| AtomEntry {
+                id: e.id,
+                link: Link { rel: "alternate".into(), href: e.link, r#type: "".into() },
+                title: e.title,
+                updated: e.updated.to_string()
+            }).collect()
         };
-        root
-    }
 
-    fn serialize_entries(entries: Vec<Entry>) -> Vec<XMLNode> {
-        entries.into_iter().map(|mut entry| XMLNode::Element(Element {
-            name: "entry".into(),
-            namespaces: Some(Namespace(BTreeMap::from([
-                ("".into(), "http://www.w3.org/2005/Atom".into())
-            ]))),
-            namespace: Some("http://www.w3.org/2005/Atom".into()),
-            prefix: None,
-            attributes: HashMap::new(),
-            children: vec![
-                Feed::text_element("title".into(), std::mem::replace(&mut entry.title, String::new())),
-                Feed::text_element("id".into(), std::mem::replace(&mut entry.id, String::new())),
-                Feed::link(&entry.link),
-                Feed::text_element("updated".into(), entry.updated.to_rfc3339())
-            ]
-        })).collect()
-    }
+        let yaserde_cfg = yaserde::ser::Config{
+            perform_indent: true,
+            .. Default::default()
+        };
 
-    fn text_element(name: String, text: String) -> XMLNode {
-        XMLNode::Element(Element {
-            prefix: None,
-            name: name,
-            namespaces: Some(Namespace(BTreeMap::from([
-                ("".into(), "http://www.w3.org/2005/Atom".into())
-            ]))),
-            namespace: Some("http://www.w3.org/2005/Atom".into()),
-            attributes: HashMap::new(),
-            children: vec![
-                XMLNode::Text(text)
-            ]
-        })
-    }
-
-    fn link(url: &str) -> XMLNode {
-        XMLNode::Element(Element {
-            prefix: None,
-            name: "link".into(),
-            namespaces: Some(Namespace(BTreeMap::from([
-                ("".into(), "http://www.w3.org/2005/Atom".into())
-            ]))),
-            namespace: Some("http://www.w3.org/2005/Atom".into()),
-            attributes: [("href".into(), url.into())].into(),
-            children: vec![]
-        })
+        Ok(yaserde::ser::to_string_with_config(&feed, &yaserde_cfg)?)
     }
 }
