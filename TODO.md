@@ -12,12 +12,12 @@ Project Description
 - [ ] Web server that hosts static comedy category atom feed  
 - [ ] Web server caches static feed for a while  
 - [ ] Webserver caches dynamic feed  
-- [ ] Used by MonitoRSS  
 - [ ] culture feed  
 - [ ] Nitter image posts are split up  
 
 ### In Progress
 
+- [ ] Used by MonitoRSS  
 
 ### Done ✓
 
