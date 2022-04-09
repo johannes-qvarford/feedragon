@@ -16,13 +16,13 @@ use derive_more::Display;
 
 #[derive(Display, Debug)]
 struct MyError {
-    err: anyhow::Error,
+    err: Error,
 }
 
 impl ResponseError for MyError {}
 
-impl From<anyhow::Error> for MyError {
-    fn from(err: anyhow::Error) -> MyError {
+impl From<Error> for MyError {
+    fn from(err: Error) -> MyError {
         MyError { err }
     }
 }
