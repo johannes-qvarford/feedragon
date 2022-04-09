@@ -1,5 +1,6 @@
 mod parsing;
 mod atom_parser;
+mod rss_parser;
 mod xml_tree;
 
 #[macro_use] extern crate serde_derive;
@@ -33,7 +34,7 @@ async fn invidious_proxy(q: web::Query<InvidiousProxyQuery>) -> Result<String, B
 
     let parser = atom_parser::AtomParser{};
     let feed = parser.parse_feed(tree).map_err(anyhow::Error::msg)?;
-    let response_tree = parser.serialize_feed(feed);
+    let response_tree = feed.serialize();
 
     let response_body = write_element_to_string(&response_tree, &q.proxied)?;
     Ok(response_body)

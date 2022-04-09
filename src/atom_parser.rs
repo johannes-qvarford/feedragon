@@ -1,10 +1,9 @@
 use crate::parsing::*;
 use chrono::prelude::*;
 use crate::xml_tree::*;
-use xmltree::{XMLNode, Element, Namespace};
+use xmltree::{Element};
 use std::borrow::Borrow;
-use std::collections::{HashMap, BTreeMap};
-use url::Url;
+
 
 pub struct AtomParser;
 
@@ -31,31 +30,12 @@ impl Parser for AtomParser {
             title: tree.element("title")?.text()?.value_ref().to_string()
         })
     }
-
-    fn serialize_feed(&self, feed: Feed) -> Element {
-        let mut feed_children = vec![
-            self.text_element("id", &feed.id),
-            self.link(&feed.link.as_str()),
-        ];
-        feed_children.append(&mut self.serialize_entries(feed.entries));
-        let root = Element {
-            name: "feed".into(),
-            // xmlns="http://www.w3.org/2005/Atom" xml:lang="en-US"
-            namespaces: Some(Namespace(BTreeMap::from([
-                ("".into(), "http://www.w3.org/2005/Atom".into())
-            ]))),
-            namespace: Some("http://www.w3.org/2005/Atom".into()),
-            prefix: None,
-            attributes: [("xml:lang".into(), "en-US".into())].into(),
-            children: feed_children
-        };
-        root
-    }
 }
 
 #[cfg(test)]
 mod parser_tests {
     use super::*;
+    use xmltree::XMLNode;
 
     #[test]
     fn feed_with_no_entries_can_be_parsed() {
@@ -130,52 +110,6 @@ impl AtomParser {
             link: extract_attribute("link", "href")?,
             summary: extract_text("title")?,
             updated: extract_date_time("updated")?
-        })
-    }
-
-    fn serialize_entries(&self, entries: Vec<Entry>) -> Vec<XMLNode> {
-        entries.into_iter().map(|entry| XMLNode::Element(Element {
-            name: "entry".into(),
-            namespaces: Some(Namespace(BTreeMap::from([
-                ("".into(), "http://www.w3.org/2005/Atom".into())
-            ]))),
-            namespace: Some("http://www.w3.org/2005/Atom".into()),
-            prefix: None,
-            attributes: HashMap::new(),
-            children: vec![
-                self.text_element("title", &entry.title),
-                self.text_element("id", &entry.id),
-                self.link(&entry.link),
-                self.text_element("updated", &entry.updated.to_rfc3339())
-            ]
-        })).collect()
-    }
-
-    fn text_element(&self, name: &str, text: &str) -> XMLNode {
-        XMLNode::Element(Element {
-            prefix: None,
-            name: name.into(),
-            namespaces: Some(Namespace(BTreeMap::from([
-                ("".into(), "http://www.w3.org/2005/Atom".into())
-            ]))),
-            namespace: Some("http://www.w3.org/2005/Atom".into()),
-            attributes: HashMap::new(),
-            children: vec![
-                XMLNode::Text(text.into())
-            ]
-        })
-    }
-
-    fn link(&self, url: &str) -> XMLNode {
-        XMLNode::Element(Element {
-            prefix: None,
-            name: "link".into(),
-            namespaces: Some(Namespace(BTreeMap::from([
-                ("".into(), "http://www.w3.org/2005/Atom".into())
-            ]))),
-            namespace: Some("http://www.w3.org/2005/Atom".into()),
-            attributes: [("href".into(), url.into())].into(),
-            children: vec![]
         })
     }
 }
