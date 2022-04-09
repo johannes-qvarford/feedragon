@@ -6,6 +6,7 @@ Project Description
 
 ### Todo
 
+- [ ] Formatting in pipeline.  
 - [ ] Combine multiple atom feeds  
 - [ ] Generate atom feed from category list from file  
 - [ ] Web server that hosts static comedy category atom feed  
@@ -17,9 +18,9 @@ Project Description
 
 ### In Progress
 
-- [ ] Simplified atom feed for nitter  
 
 ### Done ✓
 
 - [x] Simplified atom feed for invidious  
+- [x] Simplified atom feed for nitter  
 
