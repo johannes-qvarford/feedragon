@@ -19,12 +19,12 @@ async fn index(params: web::Path<(u32, String)>) -> impl Responder {
 }
 
 #[derive(Deserialize)]
-struct InvidiousProxyQuery {
+struct ProxyQuery {
     proxied: String
 }
 
-#[get("/feeds/invidious-proxy")]
-async fn invidious_proxy(q: web::Query<InvidiousProxyQuery>) -> Result<String, Box<dyn Error>> {
+#[get("/feeds/atom-proxy")]
+async fn atom_proxy(q: web::Query<ProxyQuery>) -> Result<String, Box<dyn Error>> {
     let body = reqwest::get(q.proxied.clone())
         .await?
         .bytes()
@@ -40,9 +40,26 @@ async fn invidious_proxy(q: web::Query<InvidiousProxyQuery>) -> Result<String, B
     Ok(response_body)
 }
 
-#[actix_web::main] // or #[tokio::main]
+#[get("/feeds/rss-proxy")]
+async fn rss_proxy(q: web::Query<ProxyQuery>) -> Result<String, Box<dyn Error>> {
+    let body = reqwest::get(q.proxied.clone())
+        .await?
+        .bytes()
+        .await?;
+
+    let tree = xmltree::Element::parse(body.reader())?;
+
+    let parser = rss_parser::RssParser{};
+    let feed = parser.parse_feed(tree).map_err(anyhow::Error::msg)?;
+    let response_tree = feed.serialize();
+
+    let response_body = write_element_to_string(&response_tree, &q.proxied)?;
+    Ok(response_body)
+}
+
+#[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| App::new().service(index).service(invidious_proxy))
+    HttpServer::new(|| App::new().service(index).service(atom_proxy).service(rss_proxy))
         .bind(("127.0.0.1", 8080))?
         .run()
         .await

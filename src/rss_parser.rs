@@ -6,7 +6,7 @@ use crate::xml_tree;
 use yaserde_derive::YaDeserialize;
 use yaserde::de::from_str;
 
-struct RssParser {}
+pub struct RssParser {}
 
 #[derive(YaDeserialize, Default, Debug, PartialEq)]
 #[yaserde(
