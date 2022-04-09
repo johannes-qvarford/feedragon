@@ -18,8 +18,8 @@ Project Description
 
 ### In Progress
 
-- [ ] Simplified atom feed for invidious  
 
 ### Done ✓
 
+- [x] Simplified atom feed for invidious  
 
