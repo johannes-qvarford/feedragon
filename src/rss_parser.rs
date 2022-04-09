@@ -1,10 +1,9 @@
+use yaserde::de::from_reader;
 use chrono::DateTime;
 use url::Url;
 use crate::Parser;
 use crate::parsing;
-use crate::xml_tree;
 use yaserde_derive::YaDeserialize;
-use yaserde::de::from_str;
 
 pub struct RssParser {}
 
@@ -55,11 +54,8 @@ struct Link {
 }
 
 impl Parser for RssParser {
-
-    fn parse_feed(&self, element: xmltree::Element) -> std::result::Result<parsing::Feed, parsing::ParsingError> {
-        let s = xml_tree::write_element_to_string(&element, "random")
-            .map_err(|e| parsing::ParsingError::InvalidXmlStructure(e.to_string()))?;
-        let mut f: Rss = from_str(&s).map_err(parsing::ParsingError::InvalidXmlStructure)?;
+    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> std::result::Result<parsing::Feed, parsing::ParsingError> {
+        let mut f: Rss = from_reader(bytes).map_err(parsing::ParsingError::InvalidXmlStructure)?;
 
         // Even though we require that the link element should have the atom namespace, the regular rss link element is still included.
         // We therefor have to find the actual atom link.
