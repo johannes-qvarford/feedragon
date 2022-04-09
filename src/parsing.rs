@@ -1,4 +1,3 @@
-use crate::write_element_to_string;
 use std::collections::HashMap;
 use xmltree::XMLNode;
 use std::collections::BTreeMap;
@@ -32,15 +31,7 @@ pub enum ParsingError {
 }
 
 pub trait Parser {
-    fn parse_feed(&self, tree: Element) -> Result<Feed, ParsingError> {
-        let s = write_element_to_string(&tree, "random")
-            .map_err(|e| ParsingError::InvalidXmlStructure(e.to_string()))?;
-        self.parse_feed_from_bytes(s.as_bytes())
-    }
-    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed, ParsingError> {
-        self.parse_feed(xmltree::Element::parse(bytes)
-            .map_err(|e| ParsingError::InvalidXmlStructure(e.to_string()))?)
-    }
+    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed, ParsingError>;
 }
 
 impl Feed {
