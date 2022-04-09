@@ -7,6 +7,7 @@ use xmltree::Element;
 use url::Url;
 use chrono::prelude::*;
 use derive_more::{Display};
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Entry {
     pub title: String,

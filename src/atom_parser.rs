@@ -1,33 +1,90 @@
+use url::Url;
+use yaserde::de::from_reader;
+use crate::atom_parser::ParsingError::InvalidXmlStructure;
 use crate::parsing::*;
 use chrono::prelude::*;
-use crate::xml_tree::*;
-use xmltree::{Element};
-use std::borrow::Borrow;
+use yaserde_derive::YaDeserialize;
 
+#[derive(YaDeserialize, Default, Debug, PartialEq)]
+#[yaserde(
+    prefix = "ns",
+    namespace = "ns: http://www.w3.org/2005/Atom"
+    root = "feed"
+    rename = "feed"
+)]
+struct AtomFeed {
+    #[yaserde(rename="link", prefix="ns")]
+    links: Vec<Link>,
+    #[yaserde(prefix="ns")]
+    title: String,
+    #[yaserde(rename="entry", prefix="ns")]
+    entries: Vec<AtomEntry>,
+}
+
+#[derive(YaDeserialize, Default, Debug, PartialEq)]
+#[yaserde(
+    prefix = "ns",
+    namespace = "ns: http://www.w3.org/2005/Atom"
+)]
+struct AtomEntry {
+    #[yaserde(prefix="ns")]
+    title: String,
+    #[yaserde(prefix="ns")]
+    id: String,
+    #[yaserde(prefix="ns")]
+    link: Link,
+    #[yaserde(prefix="ns")]
+    updated: String,
+}
+
+#[derive(YaDeserialize, Default, Debug, PartialEq)]
+#[yaserde(
+    prefix = "ns",
+    namespace = "ns: http://www.w3.org/2005/Atom"
+)]
+struct Link {
+    #[yaserde(attribute, prefix="ns")]
+    href: String,
+    #[yaserde(attribute, prefix="ns")]
+    rel: String,
+    #[yaserde(attribute, rename="type", prefix="ns")]
+    r#type: String
+}
 
 pub struct AtomParser;
 
 impl Parser for AtomParser {
-    fn parse_feed(&self, tree: Element) -> Result<Feed, ParsingError> {
-        let tree: ElementContext = (&tree).into();
-        let entry_results: Vec<Result<Entry, ParsingError>> = tree.elements("entry")
-            .map(|ec| self.parse_entry(&ec)).value_take();
+    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed, ParsingError> {
+        let mut f: AtomFeed = from_reader(bytes).map_err(InvalidXmlStructure)?;
 
+        let href = &f.links.iter().find(|li| li.r#type == "application/atom+xml")
+        .ok_or_else(|| InvalidXmlStructure("Could not find self-referencial link in atom feed".into()))?
+        .href;
+        let link = Url::parse(href).map_err(|err| InvalidXmlStructure(format!("Invalid url {}", err)))?;
+
+        let entries = std::mem::replace(&mut f.entries, vec![]);
+        let entry_results: Vec<Result<Entry, ParsingError>> = entries.into_iter().map(|ae| {
+            let updated = DateTime::parse_from_rfc3339(&ae.updated).map_err(|e| InvalidXmlStructure(e.to_string()))?;
+            let e = Entry {
+                id: ae.id,
+                summary: ae.title.clone(),
+                link: ae.link.href,
+                title: ae.title,
+                updated: updated.into()
+            };
+            Ok(e)
+        }).collect();
         let mut entries = vec![];
         for e in entry_results {
             entries.push(e?);
         }
 
-        Ok(Feed {
+        Ok(Feed{
             author_name: "Unknown".into(),
-            entries: entries,
-            id: tree.element("title")?.text()?.value_ref().to_string(),
-            link: tree.elements("link")
-                .find_with_attribute_value("rel", "self")
-                .into_parsing_result()?
-                .attribute("href")?
-                .try_into()?,
-            title: tree.element("title")?.text()?.value_ref().to_string()
+            id: f.title.clone(),
+            link: link,
+            title: f.title,
+            entries: entries
         })
     }
 }
@@ -75,33 +132,5 @@ mod parser_tests {
             title: "Example feed".into()
         };
         assert_eq!(Ok(expected), feed);
-    }
-}
-
-impl AtomParser {
-    fn parse_entry(&self, atom_entry: &ElementContext) -> Result<Entry, ParsingError> {
-        let extract_text = |id: &str| -> Result<String, ParsingError> {
-             Ok(atom_entry.element(id)?.text()?.value_ref().to_string())
-        };
-
-        let extract_attribute = |id: &str, attribute_name: &str| -> Result<String, ParsingError> {
-            Ok(atom_entry.element(id)?.attribute(attribute_name)?.value_ref().to_string())
-        };
-
-        let extract_date_time = |id: &str| -> Result<DateTime<Utc>, ParsingError> {
-            let element = atom_entry.element(id)?;
-            let text = element.text()?;
-            let date_time_with_offset = DateTime::parse_from_rfc3339(text.value_ref().borrow())
-                .map_err(|_dt_err| text.invalid_xml_structure("Invalid rfc 3339 date time"))?;
-            return Ok(DateTime::from(date_time_with_offset))
-        };
-
-        Ok(Entry {
-            title: extract_text("title")?,
-            id: extract_text("id")?,
-            link: extract_attribute("link", "href")?,
-            summary: extract_text("title")?,
-            updated: extract_date_time("updated")?
-        })
     }
 }
