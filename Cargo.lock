@@ -387,6 +387,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "derive-alias"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3dca1db580f7272cecbab39c6289e185f6958abee5317c968f7eacda82c4ec2"
+
+[[package]]
 name = "derive_more"
 version = "0.99.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -435,6 +441,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "chrono",
+ "derive-alias",
  "derive_more",
  "hex",
  "md-5",

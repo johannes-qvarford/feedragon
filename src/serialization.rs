@@ -23,24 +23,24 @@ pub struct Feed {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Display)]
-pub enum ParsingError {
+pub enum DeserializationError {
     InvalidXmlStructure(String)
 }
 
-pub trait Parser {
-    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed, ParsingError>;
+pub trait FeedDeserializer {
+    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed, DeserializationError>;
 }
 
 impl Feed {
-    pub fn serialize_to_string(mut self) -> Result<String, Box<dyn Error>> {
+    pub fn serialize_to_string(self) -> Result<String, Box<dyn Error>> {
         let feed = AtomFeed {
             title: self.title,
             links: vec![
-                Link { r#type: "application/atom+xml".into(), rel: "self".into(), href: self.link.as_str().into() }
+                AtomLink { link_type: "application/atom+xml".into(), rel: "self".into(), href: self.link.as_str().into() }
             ],
             entries: self.entries.into_iter().map(|e| AtomEntry {
                 id: e.id,
-                link: Link { rel: "alternate".into(), href: e.link, r#type: "".into() },
+                link: AtomLink { rel: "alternate".into(), href: e.link, link_type: "".into() },
                 title: e.title,
                 updated: e.updated.to_string()
             }).collect()

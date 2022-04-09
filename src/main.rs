@@ -1,13 +1,15 @@
-mod parsing;
-mod atom_parser;
-mod rss_parser;
+mod serialization;
+mod atom_serialization;
+mod rss_serialization;
 mod atom;
 
 #[macro_use] extern crate serde_derive;
+use crate::rss_serialization::RssDeserializer;
+use crate::atom_serialization::AtomDeserializer;
 use actix_web::{get, web, App, HttpServer, Responder};
 use reqwest;
 use std::error::Error;
-use parsing::Parser;
+use serialization::FeedDeserializer;
 use anyhow;
 
 #[get("/{id}/{name}/index.html")]
@@ -28,7 +30,7 @@ async fn atom_proxy(q: web::Query<ProxyQuery>) -> Result<String, Box<dyn Error>>
         .bytes()
         .await?;
 
-    let parser = atom_parser::AtomParser{};
+    let parser = AtomDeserializer{};
     let feed = parser.parse_feed_from_bytes(body.as_ref()).map_err(anyhow::Error::msg)?;
 
     let response_body = feed.serialize_to_string()?;
@@ -42,7 +44,7 @@ async fn rss_proxy(q: web::Query<ProxyQuery>) -> Result<String, Box<dyn Error>> 
         .bytes()
         .await?;
 
-    let parser = rss_parser::RssParser{};
+    let parser = RssDeserializer{};
     let feed = parser.parse_feed_from_bytes(body.as_ref()).map_err(anyhow::Error::msg)?;
 
     let response_body = feed.serialize_to_string()?;

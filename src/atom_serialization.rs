@@ -1,23 +1,23 @@
+use crate::atom_serialization::DeserializationError::InvalidXmlStructure;
 use url::Url;
 use yaserde::de::from_reader;
-use crate::atom_parser::ParsingError::InvalidXmlStructure;
-use crate::parsing::*;
+use crate::serialization::*;
 use chrono::prelude::*;
 use crate::atom::*;
 
-pub struct AtomParser;
+pub struct AtomDeserializer;
 
-impl Parser for AtomParser {
-    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed, ParsingError> {
-        let mut f: AtomFeed = from_reader(bytes).map_err(InvalidXmlStructure)?;
+impl FeedDeserializer for AtomDeserializer {
+    fn parse_feed_from_bytes(&self, bytes: &[u8]) -> Result<Feed, DeserializationError> {
+        let mut feed: AtomFeed = from_reader(bytes).map_err(InvalidXmlStructure)?;
 
-        let href = &f.links.iter().find(|li| li.r#type == "application/atom+xml")
-        .ok_or_else(|| InvalidXmlStructure("Could not find self-referencial link in atom feed".into()))?
-        .href;
+        let href = &feed.links.iter().find(|li| li.link_type == "application/atom+xml")
+            .ok_or_else(|| InvalidXmlStructure("Could not find self-referencial link in atom feed".into()))?
+            .href;
         let link = Url::parse(href).map_err(|err| InvalidXmlStructure(format!("Invalid url {}", err)))?;
 
-        let entries = std::mem::replace(&mut f.entries, vec![]);
-        let entry_results: Vec<Result<Entry, ParsingError>> = entries.into_iter().map(|ae| {
+        let entries = std::mem::replace(&mut feed.entries, vec![]);
+        let entry_results: Vec<Result<Entry, DeserializationError>> = entries.into_iter().map(|ae| {
             let updated = DateTime::parse_from_rfc3339(&ae.updated).map_err(|e| InvalidXmlStructure(e.to_string()))?;
             let e = Entry {
                 id: ae.id,
@@ -35,9 +35,9 @@ impl Parser for AtomParser {
 
         Ok(Feed{
             author_name: "Unknown".into(),
-            id: f.title.clone(),
+            id: feed.title.clone(),
             link: link,
-            title: f.title,
+            title: feed.title,
             entries: entries
         })
     }
@@ -49,11 +49,11 @@ mod parser_tests {
 
     #[test]
     fn feed_with_no_entries_can_be_parsed() {
-        let feed_str = std::fs::read_to_string("src/example_empty_atom_feed.xml")
+        let feed_str = std::fs::read_to_string("src/res/example_empty_atom_feed.xml")
             .expect("Expected example file to exist.");
-        let parser = AtomParser{};
+        let deserializer = AtomDeserializer{};
         
-        let feed = parser.parse_feed_from_bytes(feed_str.as_bytes());
+        let feed = deserializer.parse_feed_from_bytes(feed_str.as_bytes());
         let expected = Feed {
             author_name: "Unknown".into(),
             entries: vec![],
@@ -66,11 +66,11 @@ mod parser_tests {
 
     #[test]
     fn feed_with_one_entry_can_be_parsed() {
-        let feed_str = std::fs::read_to_string("src/example_one_element_atom_feed.xml")
+        let feed_str = std::fs::read_to_string("src/res/example_one_element_atom_feed.xml")
             .expect("Expected example file to exist.");
-        let parser = AtomParser{};
+        let deserializer = AtomDeserializer{};
 
-        let feed = parser.parse_feed_from_bytes(feed_str.as_bytes());
+        let feed = deserializer.parse_feed_from_bytes(feed_str.as_bytes());
 
         let expected = Feed {
             author_name: "Unknown".into(),
