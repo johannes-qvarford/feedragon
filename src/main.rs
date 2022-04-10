@@ -15,15 +15,16 @@ use anyhow;
 use derive_more::Display;
 
 #[derive(Display, Debug)]
-struct MyError {
+struct LoggingError {
     err: Error,
 }
 
-impl ResponseError for MyError {}
+impl ResponseError for LoggingError {}
 
-impl From<Error> for MyError {
-    fn from(err: Error) -> MyError {
-        MyError { err }
+impl From<Error> for LoggingError {
+    fn from(err: Error) -> LoggingError {
+        log::error!("{:#?}", err);
+        LoggingError { err }
     }
 }
 
@@ -39,27 +40,30 @@ struct ProxyQuery {
 }
 
 #[get("/feeds/atom-proxy")]
-async fn atom_proxy(q: web::Query<ProxyQuery>) -> Result<String, MyError> {
+async fn atom_proxy(q: web::Query<ProxyQuery>) -> Result<String, LoggingError> {
     let body = reqwest::get(q.proxied.clone())
-        .await.with_context(|| format!("Failed to fetch atom feed {}", q.proxied.clone()))?
+        .await
+        .with_context(|| format!("Failed to fetch atom feed {}", q.proxied.clone()))?
         .bytes()
-        .await.context("Failed to extract byte request body")?;
+        .await
+        .context("Failed to extract byte request body")?;
 
     let parser = AtomDeserializer{};
     let feed = parser.parse_feed_from_bytes(body.as_ref())
         .with_context(|| format!("Failed to parse atom feed {}", q.proxied.clone()))?;
-
     let response_body = feed.serialize_to_string()
         .with_context(|| format!("Failed to convert parsed atom feed to string {}", q.proxied.clone()))?;
     Ok(response_body)
 }
 
 #[get("/feeds/rss-proxy")]
-async fn rss_proxy(q: web::Query<ProxyQuery>) -> Result<String, MyError> {
+async fn rss_proxy(q: web::Query<ProxyQuery>) -> Result<String, LoggingError> {
     let body = reqwest::get(q.proxied.clone())
-        .await.with_context(|| format!("Failed to fetch atom feed {}", q.proxied.clone()))?
+        .await
+        .with_context(|| format!("Failed to fetch atom feed {}", q.proxied.clone()))?
         .bytes()
-        .await.context("Failed to extract byte request body")?;
+        .await
+        .context("Failed to extract byte request body")?;
 
     let parser = RssDeserializer{};
     let feed = parser.parse_feed_from_bytes(body.as_ref())
@@ -72,6 +76,8 @@ async fn rss_proxy(q: web::Query<ProxyQuery>) -> Result<String, MyError> {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    env_logger::init();
+
     HttpServer::new(|| App::new().service(index).service(atom_proxy).service(rss_proxy))
         .bind(("0.0.0.0", 8080))?
         .run()
