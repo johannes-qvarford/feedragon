@@ -16,14 +16,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Installing toolchain...
+      - name: Toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+      - name: Toolchain components
+        run: rustup component add rustfmt
       - name: Format
         uses: actions-rs/cargo@v1
         with:
-          command: fmt --check
+          command: fmt
+          args: --check
       - name: Build
         uses: actions-rs/cargo@v1
         with:
