@@ -17,10 +17,10 @@ Project Description
 
 ### In Progress
 
-- [ ] Used by MonitoRSS  
 
 ### Done ✓
 
 - [x] Simplified atom feed for invidious  
 - [x] Simplified atom feed for nitter  
+- [x] Used by MonitoRSS  
 
