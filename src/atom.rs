@@ -1,6 +1,6 @@
+use derive_alias::derive_alias;
 use yaserde_derive::YaDeserialize;
 use yaserde_derive::YaSerialize;
-use derive_alias::derive_alias;
 
 derive_alias! {
     derive_item => #[derive(YaDeserialize, YaSerialize, Default, Debug, PartialEq)]

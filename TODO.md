@@ -6,7 +6,6 @@ Project Description
 
 ### Todo
 
-- [ ] Formatting in pipeline.  
 - [ ] Combine multiple atom feeds  
 - [ ] Generate atom feed from category list from file  
 - [ ] Web server that hosts static comedy category atom feed  
@@ -17,6 +16,7 @@ Project Description
 
 ### In Progress
 
+- [ ] Formatting in pipeline.  
 
 ### Done ✓
 
