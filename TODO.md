@@ -7,6 +7,7 @@ Project Description
 ### Todo
 
 - [ ] Generate atom feed from category list from file  
+- [ ] Individual feed download failure is ignored.  
 - [ ] Webserver caches dynamic feed  
 - [ ] culture feed  
 - [ ] Nitter image posts are split up  
