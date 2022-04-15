@@ -16,11 +16,11 @@ Project Description
 
 ### In Progress
 
-- [ ] Formatting in pipeline.  
 
 ### Done ✓
 
 - [x] Simplified atom feed for invidious  
 - [x] Simplified atom feed for nitter  
 - [x] Used by MonitoRSS  
+- [x] Formatting in pipeline.  
 
