@@ -1,6 +1,6 @@
+use anyhow::{Context, Error, Result};
 use chrono::prelude::*;
 use url::Url;
-use anyhow::{Error, Result, Context};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Entry {

@@ -59,4 +59,3 @@ pub async fn download_feed(deserializer: &dyn FeedDeserializer, url: &Url) -> Re
         .context("Failed to extract byte request body")?;
     deserializer.parse_feed_from_bytes(body.as_ref())
 }
-
