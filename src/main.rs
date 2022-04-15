@@ -1,5 +1,6 @@
 mod atom;
 mod atom_serialization;
+mod model;
 mod rss_serialization;
 mod serialization;
 

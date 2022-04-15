@@ -1,26 +1,7 @@
 use crate::atom::*;
+use crate::model::*;
 use anyhow::Result;
 use anyhow::*;
-use chrono::prelude::*;
-use url::Url;
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct Entry {
-    pub title: String,
-    pub link: String,
-    pub id: String,
-    pub updated: DateTime<Utc>,
-    pub summary: String,
-}
-
-#[derive(Debug, PartialEq)]
-pub struct Feed {
-    pub title: String,
-    pub link: Url,
-    pub author_name: String,
-    pub id: String,
-    pub entries: Vec<Entry>,
-}
 
 pub fn invalid_xml_structure(s: String) -> Error {
     Error::msg(format!("Invalid xml structure: {}", s))

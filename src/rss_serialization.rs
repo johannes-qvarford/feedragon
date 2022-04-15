@@ -1,6 +1,6 @@
+use crate::model::Entry;
+use crate::model::Feed;
 use crate::serialization::invalid_xml_structure;
-use crate::serialization::Entry;
-use crate::serialization::Feed;
 use crate::FeedDeserializer;
 use anyhow::{Context, Result};
 use chrono::DateTime;
