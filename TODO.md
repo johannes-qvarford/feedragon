@@ -6,16 +6,14 @@ Project Description
 
 ### Todo
 
-- [ ] Combine multiple atom feeds  
 - [ ] Generate atom feed from category list from file  
-- [ ] Web server that hosts static comedy category atom feed  
-- [ ] Web server caches static feed for a while  
 - [ ] Webserver caches dynamic feed  
 - [ ] culture feed  
 - [ ] Nitter image posts are split up  
 
 ### In Progress
 
+- [ ] Combine multiple atom feeds  
 
 ### Done ✓
 
