@@ -36,7 +36,7 @@ pub struct FeedProvider {
 }
 
 impl FeedProvider {
-    pub fn from_category_file(filename: &str) -> Result<FeedProvider> {
+    pub fn from_file(filename: &str) -> Result<FeedProvider> {
         let s = read_to_string(filename)
             .with_context(|| format!("Failed to read category file {}", filename))?;
         let root: Root = toml::from_str(&s)
@@ -74,7 +74,7 @@ impl FeedProvider {
         Ok(FeedProvider { categories })
     }
 
-    async fn feed_by_category(&self, category_name: &str) -> Result<Feed> {
+    pub async fn feed_by_category(&self, category_name: &str) -> Result<Feed> {
         let category = self
             .categories
             .get(category_name)
