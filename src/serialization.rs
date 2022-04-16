@@ -51,7 +51,7 @@ impl Feed {
     }
 }
 
-pub async fn download_feed(deserializer: &Box<dyn FeedDeserializer>, url: &Url) -> Result<Feed> {
+pub async fn download_feed(deserializer: &dyn FeedDeserializer, url: &Url) -> Result<Feed> {
     let body = reqwest::get(url.clone())
         .await
         .with_context(|| format!("Failed to download feed {}", url))?

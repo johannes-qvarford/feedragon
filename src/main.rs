@@ -1,5 +1,3 @@
-#![feature(future_join, future_poll_fn)]
-
 mod atom;
 mod atom_serialization;
 mod category;
