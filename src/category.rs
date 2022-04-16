@@ -19,6 +19,7 @@ struct Root {
     categories: HashMap<String, Vec<String>>,
 }
 
+#[derive(Clone)]
 pub struct Category {
     feed_urls: Vec<Url>,
 }
@@ -31,6 +32,7 @@ fn try_all<T: Sized, E, I: Iterator<Item = Result<T, E>> + Sized>(it: I) -> Resu
     Ok(items.into_iter())
 }
 
+#[derive(Clone)]
 pub struct FeedProvider {
     categories: HashMap<String, Category>,
 }
@@ -85,7 +87,11 @@ impl FeedProvider {
 
         Ok(merge_feeds(
             category_name.into(),
-            "https://google.com".try_into()?,
+            format!(
+                "https://feedragon.privacy.qvarford.net/feeds/{}/atom.xml",
+                category_name
+            )[..]
+                .try_into()?,
             feeds,
         ))
     }
