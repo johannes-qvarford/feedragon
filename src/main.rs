@@ -1,5 +1,8 @@
+#![feature(future_join, future_poll_fn)]
+
 mod atom;
 mod atom_serialization;
+mod category;
 mod model;
 mod rss_serialization;
 mod serialization;
