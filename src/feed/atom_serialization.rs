@@ -1,10 +1,11 @@
-use crate::atom::*;
-use crate::model::*;
-use crate::serialization::*;
 use anyhow::{Context, Result};
 use chrono::prelude::*;
 use url::Url;
 use yaserde::de::from_reader;
+
+use super::{
+    atom::AtomFeed, model::Entry, serialization::invalid_xml_structure, Feed, FeedDeserializer,
+};
 
 pub struct AtomDeserializer;
 

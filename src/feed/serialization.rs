@@ -1,9 +1,8 @@
-use crate::atom::*;
-use crate::model::*;
 use anyhow::Result;
 use anyhow::*;
-use bytes::Bytes;
-use url::Url;
+
+use super::atom::{AtomEntry, AtomFeed, AtomLink};
+use super::Feed;
 
 pub fn invalid_xml_structure(s: String) -> Error {
     Error::msg(format!("Invalid xml structure: {}", s))
@@ -49,24 +48,4 @@ impl Feed {
                 format!("Failed to serialize feed to string: {}", feed.title.clone())
             })?)
     }
-}
-
-pub async fn download_feed(deserializer: &dyn FeedDeserializer, url: &Url) -> Result<Feed> {
-    let body = reqwest::get(url.clone())
-        .await
-        .with_context(|| format!("Failed to download feed {}", url))?
-        .bytes()
-        .await
-        .context("Failed to extract byte request body")?;
-    deserializer.parse_feed_from_bytes(body.as_ref())
-}
-
-pub async fn download_feed2(url: &Url) -> Result<Bytes> {
-    let body = reqwest::get(url.clone())
-        .await
-        .with_context(|| format!("Failed to download feed {}", url))?
-        .bytes()
-        .await
-        .context("Failed to extract byte request body")?;
-    Ok(body)
 }

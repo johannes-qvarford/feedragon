@@ -1,4 +1,4 @@
-use crate::category::FeedProvider;
+use crate::feed_provider::FeedProvider;
 use actix_web::ResponseError;
 use actix_web::{get, web, App, HttpServer};
 use anyhow;

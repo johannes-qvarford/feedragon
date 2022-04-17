@@ -1,11 +1,8 @@
-use crate::model::{merge_feeds, Feed};
-use crate::rss_serialization::RssDeserializer;
-use crate::serialization::{download_feed2, FeedDeserializer};
+use crate::feed::{default_feed_deserializer, merge_feeds, Feed, FeedDeserializer};
 use anyhow::{Context, Error, Result};
+use bytes::Bytes;
 use futures::future::join_all;
-use serde_derive::Deserialize;
 use std::collections::HashMap;
-use std::fs::read_to_string;
 use std::sync::Arc;
 use std::vec::IntoIter;
 use tokio::task::JoinHandle;
@@ -14,13 +11,8 @@ use url::Url;
 // TODO: We need to support dynamic serializers, so that we don't have to keep track of which feeds are
 // atom feeds and which are rss feeds. For now, only support rss feeds.
 
-#[derive(Deserialize)]
-struct Root {
-    categories: HashMap<String, Vec<String>>,
-}
-
 #[derive(Clone)]
-pub struct Category {
+struct Category {
     feed_urls: Vec<Url>,
 }
 
@@ -38,13 +30,9 @@ pub struct FeedProvider {
 }
 
 impl FeedProvider {
-    pub fn from_file(filename: &str) -> Result<FeedProvider> {
-        let s = read_to_string(filename)
-            .with_context(|| format!("Failed to read category file {}", filename))?;
-        let root: Root = toml::from_str(&s)
-            .with_context(|| format!("Failed to parse category file {}", filename))?;
+    pub fn from_categories(categories: HashMap<String, Vec<String>>) -> Result<FeedProvider> {
         let categories =
-            root.categories
+            categories
                 .into_iter()
                 .map(|name_and_urls| -> Result<(String, Category)> {
                     let feed_urls: Vec<Result<Url>> = name_and_urls
@@ -66,12 +54,7 @@ impl FeedProvider {
                     Ok((name_and_urls.0, Category { feed_urls }))
                 });
         let categories: HashMap<_, _> = try_all(categories)
-            .with_context(|| {
-                format!(
-                    "Failed to parse category file {} due to url conversion issues.",
-                    filename
-                )
-            })?
+            .with_context(|| format!("Failed to parse categories due to url conversion issues.",))?
             .collect();
         Ok(FeedProvider { categories })
     }
@@ -100,20 +83,22 @@ impl FeedProvider {
         feed_results: I,
         category_name: &str,
     ) -> Vec<Feed> {
-        let mut feeds: Vec<Feed> = vec![];
-        for feed_result in feed_results {
+        let feeds = feed_results.flat_map(|feed_result| {
             match feed_result {
-                Ok(feed) => feeds.push(feed),
-                Err(err) => log::warn!("Failed to fetch feed as part of category {}. It will not be part of the next category feed.\n{:#?}", category_name, err),
-            };
-        }
+                Ok(feed) => Some(feed),
+                Err(err) => {
+                    log::warn!("Failed to fetch feed as part of category {}. It will not be part of the next category feed.\n{:#?}", category_name, err);
+                    None
+                }
+            }
+        }).collect();
         feeds
     }
 }
 
 impl Category {
     async fn feeds(&self) -> impl Iterator<Item = Result<Feed>> {
-        let deserializer: Arc<dyn FeedDeserializer> = Arc::new(RssDeserializer {});
+        let deserializer: Arc<dyn FeedDeserializer> = Arc::new(default_feed_deserializer());
 
         type Handle = JoinHandle<Result<Feed>>;
         let mut feed_results: Vec<Handle> = vec![];
@@ -128,12 +113,22 @@ impl Category {
     }
 
     async fn get_feed(deserializer: Arc<dyn FeedDeserializer>, url: Url) -> Result<Feed> {
-        let bytes = download_feed2(&url)
+        let bytes = Category::download_feed(&url)
             .await
             .with_context(|| format!("Failed downloading feed {} as part of category", url))?;
         let feed = deserializer
             .parse_feed_from_bytes(bytes.as_ref())
             .with_context(|| format!("Failed to parse feed {} as part of category", url))?;
         Ok(feed)
+    }
+
+    async fn download_feed(url: &Url) -> Result<Bytes> {
+        let body = reqwest::get(url.clone())
+            .await
+            .with_context(|| format!("Failed to download feed {}", url))?
+            .bytes()
+            .await
+            .context("Failed to extract byte request body")?;
+        Ok(body)
     }
 }
