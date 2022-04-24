@@ -72,7 +72,6 @@ mod test {
     use crate::http_client::HttpClient;
 
     use super::*;
-    use actix_files::Files;
     use actix_http::{
         body::{self, BoxBody},
         StatusCode,
@@ -100,33 +99,54 @@ mod test {
         std::fs::read(filename).unwrap().into()
     }
 
+    struct FeedShortName(String);
+
     async fn start(
-        categories: HashMap<String, Vec<String>>,
+        category_to_short_names: HashMap<String, Vec<FeedShortName>>,
     ) -> impl Service<actix_http::Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error>
     {
-        let map = [
-            (
-                "https://nitter.privacy.qvarford.net/PhilJamesson/rss".into(),
-                bytes("./src/res/static/feed1.xml"),
-            ),
-            (
-                "https://nitter.privacy.qvarford.net/HardDriveMag/rss".into(),
-                bytes("./src/res/static/feed2.xml"),
-            ),
-        ]
-        .into();
-        let http_client = Arc::new(HashMapHttpClient { hash_map: map });
+        let url_to_content: HashMap<String, Bytes> = category_to_short_names
+            .iter()
+            .flat_map(|(_, short_names)| short_names)
+            .map(|short_name| short_name.0.clone())
+            .map(|s| {
+                (
+                    format!("https://nitter.privacy.qvarford.net/{}/rss", s),
+                    bytes(&format!("./src/res/static/{}.xml", s)),
+                )
+            })
+            .collect();
+        let http_client = Arc::new(HashMapHttpClient {
+            hash_map: url_to_content,
+        });
+        let categories: HashMap<String, Vec<String>> = category_to_short_names
+            .into_iter()
+            .map(|(category, short_names)| {
+                (
+                    category,
+                    short_names
+                        .into_iter()
+                        .map(|short_name| {
+                            format!("https://nitter.privacy.qvarford.net/{}/rss", short_name.0)
+                        })
+                        .collect(),
+                )
+            })
+            .collect();
         let provider =
             FeedProvider::from_categories_and_http_client(categories, http_client).unwrap();
         let app = init_service(App::new().configure(config_app(provider))).await;
         app
     }
 
-    async fn fetch_category(categories: HashMap<String, Vec<String>>) -> (StatusCode, String) {
-        let app = start(categories).await;
+    async fn fetch_category(
+        category: &str,
+        category_to_short_names: HashMap<String, Vec<FeedShortName>>,
+    ) -> (StatusCode, String) {
+        let app = start(category_to_short_names).await;
 
         let request = TestRequest::get()
-            .uri("/feeds/comedy/atom.xml")
+            .uri(&format!("/feeds/{}/atom.xml", category))
             .to_request();
         let response = app.call(request).await.unwrap();
 
@@ -140,17 +160,16 @@ mod test {
 
     #[actix_rt::test]
     pub async fn items_from_all_urls_in_category_are_merged() {
-        let (status_code, string) = fetch_category(
-            [(
-                "comedy".into(),
-                vec![
-                    "https://nitter.privacy.qvarford.net/PhilJamesson/rss".into(),
-                    "https://nitter.privacy.qvarford.net/HardDriveMag/rss".into(),
-                ],
-            )]
-            .into(),
-        )
-        .await;
+        let category_to_short_names = [(
+            "comedy".into(),
+            vec![
+                FeedShortName("PhilJamesson".into()),
+                FeedShortName("HardDriveMag".into()),
+            ],
+        )]
+        .into();
+
+        let (status_code, string) = fetch_category("comedy", category_to_short_names).await;
 
         assert!(
             status_code.is_success(),
