@@ -6,13 +6,13 @@ Project Description
 
 ### Todo
 
-- [ ] Secret key is required in request  
-- [ ] Webserver caches dynamic feed  
 - [ ] culture feed  
 - [ ] Nitter image posts are split up  
+- [ ] Secret key is required in request  
 
 ### In Progress
 
+- [ ] Webserver caches dynamic feed  
 
 ### Done ✓
 
