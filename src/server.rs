@@ -73,7 +73,10 @@ mod test {
 
     use super::*;
     use actix_files::Files;
-    use actix_http::body::{self, BoxBody};
+    use actix_http::{
+        body::{self, BoxBody},
+        StatusCode,
+    };
     use actix_web::{
         dev::{Service, ServiceResponse},
         test::{init_service, TestRequest},
@@ -81,13 +84,6 @@ mod test {
     use async_trait::async_trait;
     use bytes::Bytes;
     use reqwest::Url;
-
-    fn config_static_files() -> Box<dyn Fn(&mut ServiceConfig)> {
-        Box::new(move |cfg: &mut ServiceConfig| {
-            cfg.service(Files::new("/static", "./res/static").prefer_utf8(true));
-            ()
-        })
-    }
 
     struct HashMapHttpClient {
         hash_map: HashMap<String, Bytes>,
@@ -122,18 +118,29 @@ mod test {
         let http_client = Arc::new(HashMapHttpClient { hash_map: map });
         let provider =
             FeedProvider::from_categories_and_http_client(categories, http_client).unwrap();
-        let app = init_service(
-            App::new()
-                .configure(config_app(provider))
-                .configure(config_static_files()),
-        )
-        .await;
+        let app = init_service(App::new().configure(config_app(provider))).await;
         app
+    }
+
+    async fn fetch_category(categories: HashMap<String, Vec<String>>) -> (StatusCode, String) {
+        let app = start(categories).await;
+
+        let request = TestRequest::get()
+            .uri("/feeds/comedy/atom.xml")
+            .to_request();
+        let response = app.call(request).await.unwrap();
+
+        let status_code = response.status();
+        let body: BoxBody = response.into_body();
+        let bytes = body::to_bytes(body).await.unwrap();
+        let string = String::from_utf8(bytes[..].into()).unwrap();
+
+        (status_code, string)
     }
 
     #[actix_rt::test]
     pub async fn items_from_all_urls_in_category_are_merged() {
-        let app = start(
+        let (status_code, string) = fetch_category(
             [(
                 "comedy".into(),
                 vec![
@@ -145,18 +152,10 @@ mod test {
         )
         .await;
 
-        let request = TestRequest::get()
-            .uri("/feeds/comedy/atom.xml")
-            .to_request();
-        let response = app.call(request).await.unwrap();
-
         assert!(
-            response.status().is_success(),
+            status_code.is_success(),
             "Should be possible to fetch valid feeds."
         );
-        let body: BoxBody = response.into_body();
-        let bytes = body::to_bytes(body).await.unwrap();
-        let string = String::from_utf8(bytes[..].into()).unwrap();
         assert!(
             string.contains("max one jared leto role per month please. between morbius and the wework thing ive forgotten what other people look like"),
             "Expected to find an item from the first feed"
