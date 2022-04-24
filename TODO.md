@@ -6,17 +6,18 @@ Project Description
 
 ### Todo
 
-- [ ] Individual feed download failure is ignored.  
+- [ ] Secret key is required in request  
 - [ ] Webserver caches dynamic feed  
 - [ ] culture feed  
 - [ ] Nitter image posts are split up  
 
 ### In Progress
 
-- [ ] Generate atom feed from category list from file  
 
 ### Done ✓
 
+- [x] Individual feed download failure is ignored.  
+- [x] Generate atom feed from category list from file  
 - [x] Combine multiple atom feeds  
 - [x] Simplified atom feed for invidious  
 - [x] Simplified atom feed for nitter  
