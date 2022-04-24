@@ -67,6 +67,7 @@ fn config_app(provider: FeedProvider) -> Box<dyn Fn(&mut ServiceConfig)> {
 
 #[cfg(test)]
 mod test {
+    use anyhow::Result;
     use std::{collections::HashMap, sync::Arc};
 
     use crate::http_client::HttpClient;
@@ -85,34 +86,36 @@ mod test {
     use reqwest::Url;
 
     struct HashMapHttpClient {
-        hash_map: HashMap<String, Bytes>,
+        hash_map: HashMap<String, FeedShortName>,
     }
 
     #[async_trait]
     impl HttpClient for HashMapHttpClient {
         async fn get_bytes(&self, url: &Url) -> Result<Bytes> {
-            Ok(self.hash_map.get(url.as_str()).unwrap().clone())
+            let feed_short_name = self.hash_map.get(url.as_str()).unwrap();
+            bytes(&format!("./src/res/static/{}.xml", feed_short_name.0))
         }
     }
 
-    fn bytes(filename: &str) -> Bytes {
-        std::fs::read(filename).unwrap().into()
+    fn bytes(filename: &str) -> Result<Bytes> {
+        let bytes = std::fs::read(filename)?.into();
+        Ok(bytes)
     }
 
+    #[derive(Clone)]
     struct FeedShortName(String);
 
     async fn start(
         category_to_short_names: HashMap<String, Vec<FeedShortName>>,
     ) -> impl Service<actix_http::Request, Response = ServiceResponse<BoxBody>, Error = actix_web::Error>
     {
-        let url_to_content: HashMap<String, Bytes> = category_to_short_names
+        let url_to_content: HashMap<String, FeedShortName> = category_to_short_names
             .iter()
             .flat_map(|(_, short_names)| short_names)
-            .map(|short_name| short_name.0.clone())
-            .map(|s| {
+            .map(|short_name| {
                 (
-                    format!("https://nitter.privacy.qvarford.net/{}/rss", s),
-                    bytes(&format!("./src/res/static/{}.xml", s)),
+                    format!("https://nitter.privacy.qvarford.net/{}/rss", &short_name.0),
+                    short_name.clone(),
                 )
             })
             .collect();
@@ -165,6 +168,34 @@ mod test {
             vec![
                 FeedShortName("PhilJamesson".into()),
                 FeedShortName("HardDriveMag".into()),
+            ],
+        )]
+        .into();
+
+        let (status_code, string) = fetch_category("comedy", category_to_short_names).await;
+
+        assert!(
+            status_code.is_success(),
+            "Should be possible to fetch valid feeds."
+        );
+        assert!(
+            string.contains("max one jared leto role per month please. between morbius and the wework thing ive forgotten what other people look like"),
+            "Expected to find an item from the first feed"
+        );
+        assert!(
+            string.contains("three anime articles in a row????"),
+            "Expected to find an item from the second feed"
+        )
+    }
+
+    #[actix_rt::test]
+    pub async fn feeds_that_cannot_be_fetched_are_ignored() {
+        let category_to_short_names = [(
+            "comedy".into(),
+            vec![
+                FeedShortName("PhilJamesson".into()),
+                FeedShortName("HardDriveMag".into()),
+                FeedShortName("ThisFeedDoesNotExist".into()),
             ],
         )]
         .into();
