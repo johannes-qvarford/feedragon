@@ -8,9 +8,11 @@ mod feed_provider;
 mod http_client;
 mod server;
 
+use caching_http_client::CachingHttpClient;
 use config::Config;
 use feed_provider::FeedProvider;
-use http_client::{HttpClient, ReqwestHttpClient};
+use http_client::ReqwestHttpClient;
+use reqwest::Url;
 
 extern crate serde_derive;
 
@@ -18,7 +20,15 @@ extern crate serde_derive;
 async fn main() -> std::io::Result<()> {
     env_logger::init();
     let config = Config::from_toml_str(&read_to_string("feedragon.toml").unwrap()).unwrap();
-    let http_client: Arc<dyn HttpClient> = Arc::new(ReqwestHttpClient {});
+    let http_client = ReqwestHttpClient {};
+    let feed_urls = config
+        .categories
+        .iter()
+        .flat_map(|(_, url_strings)| url_strings)
+        .map(|s| Url::parse(s).unwrap());
+    let http_client =
+        CachingHttpClient::new(Arc::new(http_client), chrono::Duration::hours(1), feed_urls);
+    let http_client = Arc::new(http_client);
     let provider =
         FeedProvider::from_categories_and_http_client(config.categories, http_client).unwrap();
     let starter = server::Starter {

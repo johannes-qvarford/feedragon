@@ -18,6 +18,8 @@ derive_item! {
         pub links: Vec<AtomLink>,
         #[yaserde(prefix="ns")]
         pub title: String,
+        #[yaserde(prefix="ns")]
+        pub updated: String,
         #[yaserde(rename="entry", prefix="ns")]
         pub entries: Vec<AtomEntry>,
     }

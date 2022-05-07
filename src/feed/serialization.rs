@@ -32,9 +32,10 @@ impl Feed {
                         link_type: "".into(),
                     },
                     title: e.title,
-                    updated: e.updated.to_string(),
+                    updated: e.updated.format("%+").to_string(),
                 })
                 .collect(),
+            updated: chrono::Utc::now().format("%+").to_string(),
         };
 
         let yaserde_cfg = yaserde::ser::Config {
