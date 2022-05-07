@@ -41,7 +41,6 @@ impl<K: Eq + Hash, V: Clone + Send + std::fmt::Debug> TimedCache<K, V> {
         let new_entry = self.entries.get(&key).unwrap();
         let entry_copy = (*new_entry.lock().await).clone();
 
-        log::error!("Found entry copy {:?}", entry_copy.clone());
         match entry_copy {
             Some(CacheEntry {
                 expiration_date_time,
@@ -51,7 +50,6 @@ impl<K: Eq + Hash, V: Clone + Send + std::fmt::Debug> TimedCache<K, V> {
                     log::error!("Reuse alright!");
                     Ok(exisiting_value)
                 } else {
-                    log::error!("oh no!");
                     let result = f().await;
                     if let Ok(new_value) = result {
                         let entry = Some(self.new_cache_entry(new_value.clone()));

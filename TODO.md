@@ -6,13 +6,12 @@ Project Description
 
 ### Todo
 
-- [ ] culture feed  
 - [ ] Nitter image posts are split up  
 - [ ] Secret key is required in request  
 
 ### In Progress
 
-- [ ] Webserver caches dynamic feed  
+- [ ] video feed (rss vs atom support)  
 
 ### Done ✓
 
@@ -23,4 +22,7 @@ Project Description
 - [x] Simplified atom feed for nitter  
 - [x] Used by MonitoRSS  
 - [x] Formatting in pipeline.  
+- [x] Webserver caches dynamic feed  
+- [x] comedy feed  
+- [x] culture feed  
 
