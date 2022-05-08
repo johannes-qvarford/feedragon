@@ -1,4 +1,4 @@
-use crate::feed::{default_feed_deserializer, merge_feeds, Feed, FeedDeserializer};
+use crate::feed::{merge_feeds, Feed, FeedDeserializer};
 use crate::http_client::HttpClient;
 use anyhow::{Context, Error, Result};
 

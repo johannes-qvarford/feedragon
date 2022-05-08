@@ -111,7 +111,7 @@ mod test {
     #[derive(Clone)]
     enum FeedType {
         Nitter,
-        Invidious,
+        TwitchRss,
     }
 
     impl FeedShortName {
@@ -120,7 +120,7 @@ mod test {
                 FeedType::Nitter => {
                     format!("https://nitter.privacy.qvarford.net/{}/rss", self.value)
                 }
-                FeedType::Invidious => {
+                FeedType::TwitchRss => {
                     format!("https://twitchrss.appspot.com/vodonly/{}", self.value)
                 }
             }
@@ -195,7 +195,7 @@ mod test {
                 },
                 FeedShortName {
                     value: "tietuesday".into(),
-                    feed_type: FeedType::Invidious,
+                    feed_type: FeedType::TwitchRss,
                 },
             ],
         )]
@@ -214,11 +214,17 @@ mod test {
         assert!(
             string.contains("three anime articles in a row????"),
             "Expected to find an item from the second feed"
+        );
+        assert!(
+            string.contains("Last Stream for a week! Rogue Legacy 2!"),
+            "Expected to find an item from the third feed"
         )
     }
 
     #[actix_rt::test]
     pub async fn feeds_that_cannot_be_fetched_are_ignored() {
+        env_logger::init();
+
         let category_to_short_names = [(
             "comedy".into(),
             vec![

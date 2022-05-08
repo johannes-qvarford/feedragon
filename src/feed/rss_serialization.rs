@@ -48,6 +48,8 @@ struct Link {
     rel: String,
     #[yaserde(attribute, rename = "type")]
     link_type: String,
+    #[yaserde(text)]
+    content: String,
 }
 
 impl FeedDeserializer for RssDeserializer {
@@ -56,15 +58,13 @@ impl FeedDeserializer for RssDeserializer {
 
         // Even though we require that the link element should have the atom namespace, the regular rss link element is still included.
         // We therefor have to find the actual atom link.
-        let href = &rss
+        let href = rss
             .channel
             .link
             .iter()
             .find(|li| li.link_type == "application/rss+xml")
-            .ok_or_else(|| {
-                invalid_xml_structure("Could not find self-referencial link in rss feed".into())
-            })?
-            .href;
+            .map(|link| &link.href)
+            .unwrap_or_else(|| &rss.channel.link[0].content); // twitchrss doesn't have an atom link, so we rely on a plain <link>{url_goes_here}</link> element.
         let link = Url::parse(href)
             .map_err(|err| invalid_xml_structure(format!("Invalid url {}", err)))?;
 
@@ -145,6 +145,34 @@ mod parser_tests {
             id: "Hard Drive / @HardDriveMag".into(),
             link: "https://nitter.net/HardDriveMag/rss".try_into().unwrap(),
             title: "Hard Drive / @HardDriveMag".into()
+        };
+
+        assert_eq!(expected, feed);
+    }
+
+    #[test]
+    fn twitchrss_can_be_parsed() {
+        let feed_str = std::fs::read_to_string("src/res/example_one_element_twitchrss_feed.xml")
+            .expect("Expected example file to exist.");
+        let parser = RssDeserializer {};
+
+        let feed = parser.parse_feed_from_bytes(feed_str.as_bytes()).unwrap();
+
+        let expected = Feed {
+            author_name: "Unknown".into(),
+            entries: vec![Entry {
+                title: "Last Stream for a week! Rogue Legacy 2!".into(),
+                id: "1473376952".into(),
+                link: "https://www.twitch.tv/videos/1473376952".into(),
+                summary: r##"< shorter >"##.into(),
+                // Mon, 02 May 2022 21:31:55 UT
+                updated: DateTime::parse_from_rfc3339("2022-05-02T21:31:55+00:00")
+                    .unwrap()
+                    .into(),
+            }],
+            id: "TieTuesday's Twitch video RSS".into(),
+            link: "https://twitchrss.appspot.com/".try_into().unwrap(),
+            title: "TieTuesday's Twitch video RSS".into(),
         };
 
         assert_eq!(expected, feed);

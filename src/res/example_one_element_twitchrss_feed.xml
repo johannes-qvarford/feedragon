@@ -1,0 +1,16 @@
+<rss version="2.0">
+    <channel>
+        <title>TieTuesday's Twitch video RSS</title>
+        <link>https://twitchrss.appspot.com/</link>
+        <description>The RSS Feed of TieTuesday's videos on Twitch</description>
+        <ttl>10</ttl>
+        <item>
+            <title>Last Stream for a week! Rogue Legacy 2!</title>
+            <link>https://www.twitch.tv/videos/1473376952</link>
+            <description>&lt; shorter &gt;</description>
+            <guid isPermaLink="false">1473376952</guid>
+            <pubDate>Mon, 02 May 2022 21:31:55 UT</pubDate>
+            <category>archive</category>
+        </item>
+    </channel>
+</rss>
