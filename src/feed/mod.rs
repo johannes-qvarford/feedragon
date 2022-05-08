@@ -14,7 +14,7 @@ pub use self::serialization::FeedDeserializer;
 
 pub fn default_feed_deserializer() -> impl FeedDeserializer {
     FallbackDeserializer::new(vec![
-        Box::new(AtomDeserializer {}),
         Box::new(RssDeserializer {}),
+        Box::new(AtomDeserializer {}),
     ])
 }

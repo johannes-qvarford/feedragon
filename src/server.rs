@@ -93,7 +93,7 @@ mod test {
     impl HttpClient for HashMapHttpClient {
         async fn get_bytes(&self, url: &Url) -> Result<Bytes> {
             let feed_short_name = self.hash_map.get(url.as_str()).unwrap();
-            bytes(&format!("./src/res/static/{}.xml", feed_short_name.0))
+            bytes(&format!("./src/res/static/{}.xml", feed_short_name.value))
         }
     }
 
@@ -103,7 +103,29 @@ mod test {
     }
 
     #[derive(Clone)]
-    struct FeedShortName(String);
+    struct FeedShortName {
+        value: String,
+        feed_type: FeedType,
+    }
+
+    #[derive(Clone)]
+    enum FeedType {
+        Nitter,
+        Invidious,
+    }
+
+    impl FeedShortName {
+        fn url_string(&self) -> String {
+            match self.feed_type {
+                FeedType::Nitter => {
+                    format!("https://nitter.privacy.qvarford.net/{}/rss", self.value)
+                }
+                FeedType::Invidious => {
+                    format!("https://twitchrss.appspot.com/vodonly/{}", self.value)
+                }
+            }
+        }
+    }
 
     async fn start(
         category_to_short_names: HashMap<String, Vec<FeedShortName>>,
@@ -112,12 +134,7 @@ mod test {
         let url_to_content: HashMap<String, FeedShortName> = category_to_short_names
             .iter()
             .flat_map(|(_, short_names)| short_names)
-            .map(|short_name| {
-                (
-                    format!("https://nitter.privacy.qvarford.net/{}/rss", &short_name.0),
-                    short_name.clone(),
-                )
-            })
+            .map(|short_name| (short_name.url_string(), short_name.clone()))
             .collect();
         let http_client = Arc::new(HashMapHttpClient {
             hash_map: url_to_content,
@@ -129,9 +146,7 @@ mod test {
                     category,
                     short_names
                         .into_iter()
-                        .map(|short_name| {
-                            format!("https://nitter.privacy.qvarford.net/{}/rss", short_name.0)
-                        })
+                        .map(|short_name| short_name.url_string())
                         .collect(),
                 )
             })
@@ -170,8 +185,18 @@ mod test {
         let category_to_short_names = [(
             "comedy".into(),
             vec![
-                FeedShortName("PhilJamesson".into()),
-                FeedShortName("HardDriveMag".into()),
+                FeedShortName {
+                    value: "PhilJamesson".into(),
+                    feed_type: FeedType::Nitter,
+                },
+                FeedShortName {
+                    value: "HardDriveMag".into(),
+                    feed_type: FeedType::Nitter,
+                },
+                FeedShortName {
+                    value: "tietuesday".into(),
+                    feed_type: FeedType::Invidious,
+                },
             ],
         )]
         .into();
@@ -197,9 +222,18 @@ mod test {
         let category_to_short_names = [(
             "comedy".into(),
             vec![
-                FeedShortName("PhilJamesson".into()),
-                FeedShortName("HardDriveMag".into()),
-                FeedShortName("ThisFeedDoesNotExist".into()),
+                FeedShortName {
+                    value: "PhilJamesson".into(),
+                    feed_type: FeedType::Nitter,
+                },
+                FeedShortName {
+                    value: "HardDriveMag".into(),
+                    feed_type: FeedType::Nitter,
+                },
+                FeedShortName {
+                    value: "ThisFeedDoesNotExist".into(),
+                    feed_type: FeedType::Nitter,
+                },
             ],
         )]
         .into();
