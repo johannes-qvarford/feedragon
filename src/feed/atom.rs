@@ -36,7 +36,7 @@ derive_item! {
         #[yaserde(prefix="ns")]
         pub id: String,
         #[yaserde(prefix="ns")]
-        pub link: AtomLink,
+        pub link: AtomEntryLink,
         #[yaserde(prefix="ns")]
         pub updated: String,
     }
@@ -54,5 +54,18 @@ derive_item! {
         pub rel: String,
         #[yaserde(attribute, rename="type", prefix="ns")]
         pub link_type: String
+    }
+}
+
+derive_item! {
+    #[yaserde(
+        prefix = "ns",
+        namespace = "ns: http://www.w3.org/2005/Atom"
+    )]
+    pub struct AtomEntryLink {
+        #[yaserde(attribute, prefix="ns")]
+        pub href: String,
+        #[yaserde(attribute, prefix="ns")]
+        pub rel: String,
     }
 }

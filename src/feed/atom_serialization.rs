@@ -38,7 +38,7 @@ impl FeedDeserializer for AtomDeserializer {
                     ))
                 })?;
                 let e = Entry {
-                    id: ae.id,
+                    id: ae.link.href.clone(),
                     summary: ae.title.clone(),
                     link: ae.link.href,
                     title: ae.title,
@@ -101,7 +101,7 @@ mod parser_tests {
             author_name: "Unknown".into(),
             entries: vec![Entry {
                 title: String::from("SmallAnt makes a ✨𝘧𝘳𝘪𝘦𝘯𝘥✨"),
-                id: String::from("yt:video:be8ZARHsjmc"),
+                id: "http://invidious.privacy.qvarford.net/watch?v=be8ZARHsjmc".into(),
                 link: "http://invidious.privacy.qvarford.net/watch?v=be8ZARHsjmc"
                     .parse()
                     .unwrap(),

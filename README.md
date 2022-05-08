@@ -19,6 +19,7 @@ The project has the following dependencies:
 You also need to install rustfmt to format the source code.
 
 > rustup component add rustfmt
+>
 > cargo fmt
 
 Then you can run it as any other rust binary e.g.

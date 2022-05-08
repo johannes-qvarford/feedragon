@@ -1,7 +1,7 @@
 use anyhow::Result;
 use anyhow::*;
 
-use super::atom::{AtomEntry, AtomFeed, AtomLink};
+use super::atom::{AtomEntry, AtomEntryLink, AtomFeed, AtomLink};
 use super::Feed;
 
 pub fn invalid_xml_structure(s: String) -> Error {
@@ -26,10 +26,9 @@ impl Feed {
                 .into_iter()
                 .map(|e| AtomEntry {
                     id: e.id,
-                    link: AtomLink {
+                    link: AtomEntryLink {
                         rel: "alternate".into(),
                         href: e.link,
-                        link_type: "".into(),
                     },
                     title: e.title,
                     updated: e.updated.format("%+").to_string(),
