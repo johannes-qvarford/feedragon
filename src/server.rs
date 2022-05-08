@@ -112,6 +112,7 @@ mod test {
     enum FeedType {
         Nitter,
         TwitchRss,
+        Invidious,
     }
 
     impl FeedShortName {
@@ -123,6 +124,7 @@ mod test {
                 FeedType::TwitchRss => {
                     format!("https://twitchrss.appspot.com/vodonly/{}", self.value)
                 }
+                FeedType::Invidious => "https://invidious.privacy.qvarford.net/feed/private".into(),
             }
         }
     }
@@ -197,6 +199,10 @@ mod test {
                     value: "tietuesday".into(),
                     feed_type: FeedType::TwitchRss,
                 },
+                FeedShortName {
+                    value: "invidious".into(),
+                    feed_type: FeedType::Invidious,
+                },
             ],
         )]
         .into();
@@ -209,15 +215,19 @@ mod test {
         );
         assert!(
             string.contains("max one jared leto role per month please. between morbius and the wework thing ive forgotten what other people look like"),
-            "Expected to find an item from the first feed"
+            "Expected to find an item from the first nitter feed"
         );
         assert!(
             string.contains("three anime articles in a row????"),
-            "Expected to find an item from the second feed"
+            "Expected to find an item from the second nitter feed"
         );
         assert!(
             string.contains("Last Stream for a week! Rogue Legacy 2!"),
-            "Expected to find an item from the third feed"
+            "Expected to find an item from the first twitchrss feed"
+        );
+        assert!(
+            string.contains("SmallAnt joined the discord call at the worst time"),
+            "Expected to find an item from the first invidious feed"
         )
     }
 
