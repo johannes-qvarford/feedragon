@@ -70,7 +70,7 @@ mod test {
     use anyhow::Result;
     use std::{collections::HashMap, sync::Arc};
 
-    use crate::http_client::HttpClient;
+    use crate::{feed::default_feed_deserializer, http_client::HttpClient};
 
     use super::*;
     use actix_http::{
@@ -136,8 +136,12 @@ mod test {
                 )
             })
             .collect();
-        let provider =
-            FeedProvider::from_categories_and_http_client(categories, http_client).unwrap();
+        let provider = FeedProvider::from_categories_and_http_client_and_feed_deserializer(
+            categories,
+            http_client,
+            Arc::new(default_feed_deserializer()),
+        )
+        .unwrap();
         let app = init_service(App::new().configure(config_app(provider))).await;
         app
     }

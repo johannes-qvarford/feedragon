@@ -18,9 +18,10 @@ pub struct FeedProvider {
 }
 
 impl FeedProvider {
-    pub fn from_categories_and_http_client(
+    pub fn from_categories_and_http_client_and_feed_deserializer(
         categories: HashMap<String, Vec<String>>,
         http_client: Arc<dyn HttpClient>,
+        feed_deserializer: Arc<dyn FeedDeserializer>,
     ) -> Result<FeedProvider> {
         let categories =
             categories
@@ -47,6 +48,7 @@ impl FeedProvider {
                         Category {
                             feed_urls,
                             http_client: http_client.clone(),
+                            feed_deserializer: feed_deserializer.clone(),
                         },
                     ))
                 });
@@ -97,17 +99,19 @@ impl FeedProvider {
 struct Category {
     feed_urls: Vec<Url>,
     http_client: Arc<dyn HttpClient>,
+    feed_deserializer: Arc<dyn FeedDeserializer>,
 }
 
 impl Category {
     async fn feeds(&self) -> impl Iterator<Item = Result<Feed>> {
-        let deserializer: Arc<dyn FeedDeserializer> = Arc::new(default_feed_deserializer());
-
         type Handle = JoinHandle<Result<Feed>>;
         let mut feed_results: Vec<Handle> = vec![];
         for url in self.feed_urls.iter() {
-            let future =
-                Category::get_feed(self.http_client.clone(), deserializer.clone(), url.clone());
+            let future = Category::get_feed(
+                self.http_client.clone(),
+                self.feed_deserializer.clone(),
+                url.clone(),
+            );
             feed_results.push(tokio::spawn(future));
         }
 
