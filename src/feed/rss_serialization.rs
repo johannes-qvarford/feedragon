@@ -73,7 +73,7 @@ impl FeedDeserializer for RssDeserializer {
             .into_iter()
             .map(|it| {
                 Ok(Entry {
-                    id: it.id,
+                    id: it.link.clone(),
                     link: it.link,
                     summary: it.description,
                     title: it.title,
@@ -162,10 +162,9 @@ mod parser_tests {
             author_name: "Unknown".into(),
             entries: vec![Entry {
                 title: "Last Stream for a week! Rogue Legacy 2!".into(),
-                id: "1473376952".into(),
+                id: "https://www.twitch.tv/videos/1473376952".into(),
                 link: "https://www.twitch.tv/videos/1473376952".into(),
                 summary: r##"< shorter >"##.into(),
-                // Mon, 02 May 2022 21:31:55 UT
                 updated: DateTime::parse_from_rfc3339("2022-05-02T21:31:55+00:00")
                     .unwrap()
                     .into(),
