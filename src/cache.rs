@@ -47,7 +47,6 @@ impl<K: Eq + Hash, V: Clone + Send + std::fmt::Debug> TimedCache<K, V> {
                 value: exisiting_value,
             }) => {
                 if expiration_date_time < chrono::offset::Utc::now() {
-                    log::error!("Reuse alright!");
                     Ok(exisiting_value)
                 } else {
                     let result = f().await;

@@ -64,9 +64,12 @@ impl FeedDeserializer for RssDeserializer {
             .iter()
             .find(|li| li.link_type == "application/rss+xml")
             .map(|link| &link.href)
-            .unwrap_or_else(|| &rss.channel.link[0].content); // twitchrss doesn't have an atom link, so we rely on a plain <link>{url_goes_here}</link> element.
+            // twitchrss doesn't have an atom link, so we rely on a plain <link>{url_goes_here}</link> element.
+            .or_else(|| rss.channel.link.get(0).map(|li| &li.content))
+            .ok_or(anyhow::Error::msg("No links found"))?;
+
         let link = Url::parse(href)
-            .map_err(|err| invalid_xml_structure(format!("Invalid url {}", err)))?;
+            .map_err(|err| invalid_xml_structure(format!("Invalid feed url {}", err)))?;
 
         let items = std::mem::replace(&mut rss.channel.items, vec![]);
         let entry_results: Vec<Result<Entry>> = items
@@ -79,7 +82,10 @@ impl FeedDeserializer for RssDeserializer {
                     title: it.title,
                     updated: DateTime::parse_from_rfc2822(&it.updated)
                         .map_err(|_dt_err| {
-                            invalid_xml_structure(format!("Invalid rss date time: {}", _dt_err))
+                            invalid_xml_structure(format!(
+                                "Invalid rss entry date time: {}",
+                                _dt_err
+                            ))
                         })?
                         .into(),
                 })
