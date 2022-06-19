@@ -129,9 +129,12 @@ impl Category {
             .get_bytes(&url)
             .await
             .with_context(|| format!("Failed downloading feed {} as part of category", url))?;
-        let feed = deserializer
+        let mut feed = deserializer
             .parse_feed_from_bytes(bytes.as_ref())
             .with_context(|| format!("Failed to parse feed {} as part of category", url))?;
+        for entry in feed.entries.iter_mut() {
+            entry.id = entry.id.replace("reddit.com", "libredd.it");
+        }
         Ok(feed)
     }
 }
