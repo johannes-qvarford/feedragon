@@ -40,19 +40,14 @@ struct AppState {
     provider: FeedProvider,
 }
 
-#[derive(Clone)]
-pub struct Starter {
-    pub provider: FeedProvider,
-    pub port: u16,
-}
-
-impl Starter {
-    pub async fn start_server(self) -> std::io::Result<()> {
-        HttpServer::new(move || App::new().configure(config_app(self.provider.clone())))
-            .bind(("0.0.0.0", self.port))?
-            .run()
-            .await
-    }
+pub async fn start_server<F: Clone + Send + 'static + Fn() -> FeedProvider>(
+    port: u16,
+    factory: F,
+) -> std::io::Result<()> {
+    HttpServer::new(move || App::new().configure(config_app(factory())))
+        .bind(("0.0.0.0", port))?
+        .run()
+        .await
 }
 
 fn config_app(provider: FeedProvider) -> Box<dyn Fn(&mut ServiceConfig)> {
@@ -68,7 +63,7 @@ fn config_app(provider: FeedProvider) -> Box<dyn Fn(&mut ServiceConfig)> {
 #[cfg(test)]
 mod test {
     use anyhow::Result;
-    use std::{collections::HashMap, sync::Arc};
+    use std::{collections::HashMap, rc::Rc};
 
     use crate::{feed::default_feed_deserializer, http_client::HttpClient};
 
@@ -89,7 +84,7 @@ mod test {
         hash_map: HashMap<String, FeedShortName>,
     }
 
-    #[async_trait]
+    #[async_trait(?Send)]
     impl HttpClient for HashMapHttpClient {
         async fn get_bytes(&self, url: &Url) -> Result<Bytes> {
             let feed_short_name = self.hash_map.get(url.as_str()).unwrap();
@@ -138,7 +133,7 @@ mod test {
             .flat_map(|(_, short_names)| short_names)
             .map(|short_name| (short_name.url_string(), short_name.clone()))
             .collect();
-        let http_client = Arc::new(HashMapHttpClient {
+        let http_client = Rc::new(HashMapHttpClient {
             hash_map: url_to_content,
         });
         let categories: HashMap<String, Vec<String>> = category_to_short_names
@@ -156,7 +151,7 @@ mod test {
         let provider = FeedProvider::from_categories_and_http_client_and_feed_deserializer(
             categories,
             http_client,
-            Arc::new(default_feed_deserializer()),
+            Rc::new(default_feed_deserializer()),
         )
         .unwrap();
         let app = init_service(App::new().configure(config_app(provider))).await;

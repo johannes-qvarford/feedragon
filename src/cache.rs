@@ -1,10 +1,9 @@
-use std::{collections::HashMap, hash::Hash, sync::Arc};
+use std::{cell::RefCell, collections::HashMap, hash::Hash};
 
 use anyhow::{Context, Result};
 use chrono::Utc;
 use futures::Future;
 use log::warn;
-use tokio::sync::Mutex;
 
 #[derive(Clone, Debug)]
 pub struct CacheEntry<V: Send> {
@@ -14,7 +13,7 @@ pub struct CacheEntry<V: Send> {
 
 pub struct TimedCache<K, V: Send> {
     expiration_duration: chrono::Duration,
-    entries: Arc<HashMap<K, Mutex<Option<CacheEntry<V>>>>>,
+    entries: HashMap<K, RefCell<Option<CacheEntry<V>>>>,
 }
 
 impl<V: Clone + Send> TimedCache<String, V> {}
@@ -25,11 +24,11 @@ impl<K: Eq + Hash, V: Clone + Send + std::fmt::Debug> TimedCache<K, V> {
         category_names: I,
     ) -> TimedCache<K, V> {
         let hash_map = category_names
-            .map(|name| (name, Mutex::new(None)))
+            .map(|name| (name, RefCell::new(None)))
             .collect();
         TimedCache {
             expiration_duration: duration,
-            entries: Arc::new(hash_map),
+            entries: hash_map,
         }
     }
 
@@ -39,24 +38,21 @@ impl<K: Eq + Hash, V: Clone + Send + std::fmt::Debug> TimedCache<K, V> {
         Fut: Future<Output = Result<V>>,
     {
         let new_entry = self.entries.get(&key).unwrap();
-        let entry_copy = (*new_entry.lock().await).clone();
 
-        match entry_copy {
-            Some(CacheEntry {
-                expiration_date_time,
-                value: exisiting_value,
-            }) => {
-                if expiration_date_time < chrono::offset::Utc::now() {
-                    Ok(exisiting_value)
+        let mut borrow = new_entry.borrow_mut();
+        match borrow.as_ref() {
+            Some(entry) => {
+                if entry.expiration_date_time < chrono::offset::Utc::now() {
+                    Ok(entry.value.clone())
                 } else {
                     let result = f().await;
                     if let Ok(new_value) = result {
                         let entry = Some(self.new_cache_entry(new_value.clone()));
-                        *(new_entry.lock().await) = entry;
+                        *borrow = entry;
                         Ok(new_value)
                     } else {
                         warn!("Failed to compute a new value after expiration. The previous value was used instead.");
-                        Ok(exisiting_value)
+                        Ok(entry.value.clone())
                     }
                 }
             }
@@ -66,8 +62,7 @@ impl<K: Eq + Hash, V: Clone + Send + std::fmt::Debug> TimedCache<K, V> {
                 match &result {
                     Ok(value) => {
                         let entry = Some(self.new_cache_entry(value.clone()));
-                        let mut new_entry_lock = new_entry.lock().await;
-                        *new_entry_lock = entry;
+                        *borrow = entry;
                         result
                     }
                     Err(_) => result.context("Failed to compute a successful response when there was nothing cached to use."),

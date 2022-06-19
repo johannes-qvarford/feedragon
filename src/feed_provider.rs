@@ -4,9 +4,9 @@ use anyhow::{Context, Error, Result};
 
 use futures::future::join_all;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::rc::Rc;
 use std::vec::IntoIter;
-use tokio::task::JoinHandle;
+use tokio::task::{self, JoinHandle};
 use url::Url;
 
 // TODO: We need to support dynamic serializers, so that we don't have to keep track of which feeds are
@@ -15,13 +15,15 @@ use url::Url;
 #[derive(Clone)]
 pub struct FeedProvider {
     categories: HashMap<String, Category>,
+    http_client: Rc<dyn HttpClient>,
+    feed_deserializer: Rc<dyn FeedDeserializer>,
 }
 
 impl FeedProvider {
     pub fn from_categories_and_http_client_and_feed_deserializer(
         categories: HashMap<String, Vec<String>>,
-        http_client: Arc<dyn HttpClient>,
-        feed_deserializer: Arc<dyn FeedDeserializer>,
+        http_client: Rc<dyn HttpClient>,
+        feed_deserializer: Rc<dyn FeedDeserializer>,
     ) -> Result<FeedProvider> {
         let categories =
             categories
@@ -43,19 +45,16 @@ impl FeedProvider {
                         })?
                         .collect();
 
-                    Ok((
-                        name_and_urls.0,
-                        Category {
-                            feed_urls,
-                            http_client: http_client.clone(),
-                            feed_deserializer: feed_deserializer.clone(),
-                        },
-                    ))
+                    Ok((name_and_urls.0, Category { feed_urls }))
                 });
         let categories: HashMap<_, _> = try_all(categories)
             .with_context(|| format!("Failed to parse categories due to url conversion issues.",))?
             .collect();
-        Ok(FeedProvider { categories })
+        Ok(FeedProvider {
+            categories,
+            http_client,
+            feed_deserializer,
+        })
     }
 
     pub async fn feed_by_category(&self, category_name: &str) -> Result<Feed> {
@@ -64,7 +63,7 @@ impl FeedProvider {
             .get(category_name)
             .ok_or_else(|| Error::msg(format!("Failed to find feed category {}", category_name)))?;
 
-        let feed_results = category.feeds().await;
+        let feed_results = self.category_feeds(category).await;
         let feeds = FeedProvider::discard_err_feeds(feed_results, category_name);
 
         Ok(merge_feeds(
@@ -76,6 +75,44 @@ impl FeedProvider {
                 .try_into()?,
             feeds,
         ))
+    }
+
+    async fn category_feeds<'a>(
+        &'a self,
+        category: &'a Category,
+    ) -> impl Iterator<Item = Result<Feed>> {
+        type Handle = JoinHandle<Result<Feed>>;
+        let mut feed_results: Vec<Handle> = vec![];
+        for url in category.feed_urls.iter() {
+            let future = FeedProvider::get_feed(
+                self.http_client.clone(),
+                self.feed_deserializer.clone(),
+                url.clone(),
+            );
+            feed_results.push(task::spawn_local(future));
+        }
+
+        let results = join_all(feed_results).await;
+        let flattened_results = results.into_iter().map(|rr| Ok(rr.map_err(Error::new)??));
+        flattened_results
+    }
+
+    async fn get_feed(
+        http_client: Rc<dyn HttpClient>,
+        deserializer: Rc<dyn FeedDeserializer>,
+        url: Url,
+    ) -> Result<Feed> {
+        let bytes = http_client
+            .get_bytes(&url)
+            .await
+            .with_context(|| format!("Failed downloading feed {} as part of category", url))?;
+        let mut feed = deserializer
+            .parse_feed_from_bytes(bytes.as_ref())
+            .with_context(|| format!("Failed to parse feed {} as part of category", url))?;
+        for entry in feed.entries.iter_mut() {
+            entry.id = entry.id.replace("www.reddit.com", "libredd.it");
+        }
+        Ok(feed)
     }
 
     fn discard_err_feeds<I: Iterator<Item = Result<Feed>>>(
@@ -98,45 +135,6 @@ impl FeedProvider {
 #[derive(Clone)]
 struct Category {
     feed_urls: Vec<Url>,
-    http_client: Arc<dyn HttpClient>,
-    feed_deserializer: Arc<dyn FeedDeserializer>,
-}
-
-impl Category {
-    async fn feeds(&self) -> impl Iterator<Item = Result<Feed>> {
-        type Handle = JoinHandle<Result<Feed>>;
-        let mut feed_results: Vec<Handle> = vec![];
-        for url in self.feed_urls.iter() {
-            let future = Category::get_feed(
-                self.http_client.clone(),
-                self.feed_deserializer.clone(),
-                url.clone(),
-            );
-            feed_results.push(tokio::spawn(future));
-        }
-
-        let results = join_all(feed_results).await;
-        let flattened_results = results.into_iter().map(|rr| Ok(rr.map_err(Error::new)??));
-        flattened_results
-    }
-
-    async fn get_feed(
-        http_client: Arc<dyn HttpClient>,
-        deserializer: Arc<dyn FeedDeserializer>,
-        url: Url,
-    ) -> Result<Feed> {
-        let bytes = http_client
-            .get_bytes(&url)
-            .await
-            .with_context(|| format!("Failed downloading feed {} as part of category", url))?;
-        let mut feed = deserializer
-            .parse_feed_from_bytes(bytes.as_ref())
-            .with_context(|| format!("Failed to parse feed {} as part of category", url))?;
-        for entry in feed.entries.iter_mut() {
-            entry.id = entry.id.replace("www.reddit.com", "libredd.it");
-        }
-        Ok(feed)
-    }
 }
 
 fn try_all<T: Sized, E, I: Iterator<Item = Result<T, E>> + Sized>(it: I) -> Result<IntoIter<T>, E> {

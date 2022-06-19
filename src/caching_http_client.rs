@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::rc::Rc;
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -10,12 +10,12 @@ use crate::http_client::HttpClient;
 
 pub struct CachingHttpClient {
     cache: TimedCache<Url, Bytes>,
-    delegate: Arc<dyn HttpClient>,
+    delegate: Rc<dyn HttpClient>,
 }
 
 impl CachingHttpClient {
     pub fn new<I: Iterator<Item = Url>>(
-        delegate: Arc<dyn HttpClient>,
+        delegate: Rc<dyn HttpClient>,
         duration: chrono::Duration,
         feed_urls: I,
     ) -> CachingHttpClient {
@@ -26,7 +26,7 @@ impl CachingHttpClient {
     }
 }
 
-#[async_trait]
+#[async_trait(?Send)]
 impl HttpClient for CachingHttpClient {
     async fn get_bytes(&self, url: &Url) -> Result<Bytes> {
         let result = self

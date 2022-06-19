@@ -3,14 +3,14 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use reqwest::Url;
 
-#[async_trait]
-pub trait HttpClient: Sync + Send {
+#[async_trait(?Send)]
+pub trait HttpClient {
     async fn get_bytes(&self, url: &Url) -> Result<Bytes>;
 }
 
 pub struct ReqwestHttpClient {}
 
-#[async_trait]
+#[async_trait(?Send)]
 impl HttpClient for ReqwestHttpClient {
     async fn get_bytes(&self, url: &Url) -> Result<Bytes> {
         let body = reqwest::get(url.clone())
