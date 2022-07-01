@@ -86,18 +86,13 @@ mod test {
     use futures::future;
     use url::Url;
 
-
     fn url() -> Url {
         "https://google.com".try_into().unwrap()
     }
 
     fn cache2(duration: chrono::Duration) -> TimedCache<Url, &'static str> {
-        TimedCache::from_expiration_duration_and_keys(
-            duration,
-            vec![url()].into_iter(),
-        )
+        TimedCache::from_expiration_duration_and_keys(duration, vec![url()].into_iter())
     }
-
 
     fn cache() -> TimedCache<Url, &'static str> {
         cache2(chrono::Duration::hours(1))
@@ -115,7 +110,6 @@ mod test {
         assert_eq!("x", r);
     }
 
-    
     #[actix_rt::test]
     async fn entry_is_not_recomputed_if_it_has_not_expired() {
         let c = cache();
@@ -129,7 +123,7 @@ mod test {
             .get_or_compute(url(), || future::lazy(|_| Ok("y")))
             .await
             .unwrap();
-        
+
         assert_eq!("x", r2);
     }
 
@@ -138,15 +132,15 @@ mod test {
         let c = cache2(chrono::Duration::zero());
 
         let _ = c
-        .get_or_compute(url(), || future::lazy(|_| Ok("x")))
-        .await
-        .unwrap();
+            .get_or_compute(url(), || future::lazy(|_| Ok("x")))
+            .await
+            .unwrap();
 
         let r2 = c
-        .get_or_compute(url(), || future::lazy(|_| Ok("y")))
-        .await
-        .unwrap();
-    
+            .get_or_compute(url(), || future::lazy(|_| Ok("y")))
+            .await
+            .unwrap();
+
         assert_eq!("y", r2);
     }
 }
