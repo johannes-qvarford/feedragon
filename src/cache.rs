@@ -21,11 +21,9 @@ impl<V: Clone + Send> TimedCache<String, V> {}
 impl<K: Eq + Hash, V: Clone + Send + std::fmt::Debug> TimedCache<K, V> {
     pub fn from_expiration_duration_and_keys<I: Iterator<Item = K>>(
         duration: chrono::Duration,
-        category_names: I,
+        keys: I,
     ) -> TimedCache<K, V> {
-        let hash_map = category_names
-            .map(|name| (name, RefCell::new(None)))
-            .collect();
+        let hash_map = keys.map(|name| (name, RefCell::new(None))).collect();
         TimedCache {
             expiration_duration: duration,
             entries: hash_map,
@@ -42,7 +40,7 @@ impl<K: Eq + Hash, V: Clone + Send + std::fmt::Debug> TimedCache<K, V> {
         let mut borrow = new_entry.borrow_mut();
         match borrow.as_ref() {
             Some(entry) => {
-                if entry.expiration_date_time < chrono::offset::Utc::now() {
+                if entry.expiration_date_time.timestamp() > chrono::offset::Utc::now().timestamp() {
                     Ok(entry.value.clone())
                 } else {
                     let result = f().await;
@@ -78,5 +76,77 @@ impl<K: Eq + Hash, V: Clone + Send + std::fmt::Debug> TimedCache<K, V> {
                 .checked_add_signed(self.expiration_duration)
                 .unwrap(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+
+    use super::TimedCache;
+    use futures::future;
+    use url::Url;
+
+
+    fn url() -> Url {
+        "https://google.com".try_into().unwrap()
+    }
+
+    fn cache2(duration: chrono::Duration) -> TimedCache<Url, &'static str> {
+        TimedCache::from_expiration_duration_and_keys(
+            duration,
+            vec![url()].into_iter(),
+        )
+    }
+
+
+    fn cache() -> TimedCache<Url, &'static str> {
+        cache2(chrono::Duration::hours(1))
+    }
+
+    #[actix_rt::test]
+    async fn entry_is_computed_if_not_exists() {
+        let c = cache();
+
+        let r = c
+            .get_or_compute(url(), || future::lazy(|_| Ok("x")))
+            .await
+            .unwrap();
+
+        assert_eq!("x", r);
+    }
+
+    
+    #[actix_rt::test]
+    async fn entry_is_not_recomputed_if_it_has_not_expired() {
+        let c = cache();
+
+        let _ = c
+            .get_or_compute(url(), || future::lazy(|_| Ok("x")))
+            .await
+            .unwrap();
+
+        let r2 = c
+            .get_or_compute(url(), || future::lazy(|_| Ok("y")))
+            .await
+            .unwrap();
+        
+        assert_eq!("x", r2);
+    }
+
+    #[actix_rt::test]
+    async fn entry_is_recomputed_if_it_has_expired() {
+        let c = cache2(chrono::Duration::zero());
+
+        let _ = c
+        .get_or_compute(url(), || future::lazy(|_| Ok("x")))
+        .await
+        .unwrap();
+
+        let r2 = c
+        .get_or_compute(url(), || future::lazy(|_| Ok("y")))
+        .await
+        .unwrap();
+    
+        assert_eq!("y", r2);
     }
 }
