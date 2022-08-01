@@ -5,6 +5,7 @@ mod caching_http_client;
 mod config;
 mod feed;
 mod feed_provider;
+mod feed_transformer;
 mod http_client;
 mod server;
 
