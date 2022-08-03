@@ -200,6 +200,25 @@ mod test {
         assert_eq!(expected_feed, transformed_feed)
     }
 
+    #[actix_rt::test]
+    async fn multiple_images_can_be_extracted() {
+        let url = "https://nitter.privacy.qvarford.net/SerebiiNet/status/1554709371459981313";
+        let transformer = transformer([(url.into(), Page("nitter_two_images"))].into());
+        let feed = feed(vec![url]);
+        let expected_url1 = "https://nitter.privacy.qvarford.net/pic/media%2FFZNv5wmXgAE5UOB.jpg";
+        let expected_url2 = "https://nitter.privacy.qvarford.net/pic/media%2FFZNv6siWQAQ6A0t.jpg";
+        let mut expected_feed = feed.clone();
+
+        let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
+
+        expected_feed.entries.push(expected_feed.entries[0].clone());
+        expected_feed.entries[0].id = expected_url1.into();
+        expected_feed.entries[0].link = expected_url1.into();
+        expected_feed.entries[1].id = expected_url2.into();
+        expected_feed.entries[1].link = expected_url2.into();
+        assert_eq!(expected_feed, transformed_feed)
+    }
+
     fn transformer(page_map: HashMap<String, Page>) -> FeedTransformer {
         let http_client = HashMapHttpClient { hash_map: page_map };
         FeedTransformer {
