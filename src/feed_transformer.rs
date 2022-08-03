@@ -172,7 +172,18 @@ mod test {
         assert_eq!(expected_feed, transformed_feed)
     }
 
-    // empty_if_the_page_was_empty
+    #[actix_rt::test]
+    async fn empty_if_the_page_was_empty() {
+        let url = "https://nitter.privacy.qvarford.net/jeremysmiles/status/1554270809509748737";
+        let transformer = transformer([(url.into(), Page("empty"))].into());
+        let feed = feed(vec![url]);
+        let mut expected_feed = feed.clone();
+
+        let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
+
+        expected_feed.entries = vec![];
+        assert_eq!(expected_feed, transformed_feed)
+    }
 
     fn transformer(page_map: HashMap<String, Page>) -> FeedTransformer {
         let http_client = HashMapHttpClient { hash_map: page_map };
