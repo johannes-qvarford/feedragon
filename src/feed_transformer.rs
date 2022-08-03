@@ -7,7 +7,8 @@ use crate::{
 };
 
 use anyhow::{Context, Error, Result};
-use futures::{stream, FutureExt, Stream, StreamExt, TryStreamExt};
+use futures::{stream, FutureExt, Stream, StreamExt};
+use log::warn;
 use reqwest::Url;
 use scraper::{Html, Selector};
 
@@ -18,12 +19,11 @@ struct FeedTransformer {
 impl FeedTransformer {
     pub async fn extract_images_from_feed(&self, feed: Feed) -> Result<Feed> {
         let feed = feed;
-        let entry_results = stream::iter(feed.entries).flat_map(|e| self.convert_to_image_entry(e));
+        let stream = stream::iter(feed.entries).flat_map(|e| self.convert_to_image_entry(e));
 
-        let results: Vec<Result<Vec<Entry>>> = entry_results.collect().await;
-        let results: Result<Vec<Vec<Entry>>> = results.into_iter().collect();
-        let entries: Vec<Entry> = results
-            .with_context(|| format!("Could not extract images from feed"))?
+        let entries: Vec<Entry> = stream
+            .collect::<Vec<Vec<_>>>()
+            .await
             .into_iter()
             .flatten()
             .collect();
@@ -37,11 +37,16 @@ impl FeedTransformer {
         })
     }
 
-    fn convert_to_image_entry(&self, e: Entry) -> impl Stream<Item = Result<Vec<Entry>>> + '_ {
+    fn convert_to_image_entry(&self, e: Entry) -> impl Stream<Item = Vec<Entry>> + '_ {
+        let id = e.id.clone();
         let links = self.extract_images_from_page(e.id).into_stream();
 
-        let entries = links.map_ok(move |links| {
-            links
+        let entries = links.map(move |links_result| match links_result {
+            Err(error) => {
+                warn!("Could not extract images from {id}. Error: {error}");
+                vec![]
+            }
+            Ok(links) => links
                 .into_iter()
                 .map(|link| Entry {
                     id: link.to_string(),
@@ -50,7 +55,7 @@ impl FeedTransformer {
                     title: e.title.clone(),
                     updated: e.updated,
                 })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>(),
         });
         entries
     }
@@ -112,7 +117,10 @@ mod test {
     #[async_trait(?Send)]
     impl HttpClient for HashMapHttpClient {
         async fn get_bytes(&self, url: &Url) -> Result<Bytes> {
-            let page = self.hash_map.get(url.as_str()).unwrap();
+            let page = self
+                .hash_map
+                .get(url.as_str())
+                .ok_or(anyhow::Error::msg("Could not download url"))?;
             bytes(&format!("./src/res/static/pages/{}.html", page.0))
         }
     }
@@ -148,11 +156,21 @@ mod test {
         let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
 
         expected_feed.entries = vec![];
-        assert_eq!(expected_feed, transformed_feed,)
+        assert_eq!(expected_feed, transformed_feed)
     }
 
     #[actix_rt::test]
-    async fn empty_if_the_page_could_not_be_downloaded() {}
+    async fn empty_if_the_page_could_not_be_downloaded() {
+        let url = "https://nitter.privacy.qvarford.net/jeremysmiles/status/1554270809509748737";
+        let transformer = transformer([].into());
+        let feed = feed(vec![url]);
+        let mut expected_feed = feed.clone();
+
+        let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
+
+        expected_feed.entries = vec![];
+        assert_eq!(expected_feed, transformed_feed)
+    }
 
     // empty_if_the_page_was_empty
 
