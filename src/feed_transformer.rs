@@ -19,7 +19,7 @@ pub struct FeedTransformer {
 impl FeedTransformer {
     pub async fn extract_images_from_feed(&self, feed: Feed) -> Feed {
         let feed = feed;
-        let stream = stream::iter(feed.entries).flat_map(|e| self.convert_to_image_entry(e));
+        let stream = stream::iter(feed.entries).flat_map(|e| self.extract_images_from_entry(e));
 
         let entries: Vec<Entry> = stream
             .collect::<Vec<Vec<_>>>()
@@ -37,7 +37,7 @@ impl FeedTransformer {
         }
     }
 
-    fn convert_to_image_entry(&self, e: Entry) -> impl Stream<Item = Vec<Entry>> + '_ {
+    fn extract_images_from_entry(&self, e: Entry) -> impl Stream<Item = Vec<Entry>> + '_ {
         let id = e.id.clone();
         let links = self.extract_images_from_page(e.id).into_stream();
 
@@ -68,26 +68,45 @@ impl FeedTransformer {
             str::from_utf8(&bytes).with_context(|| format!("Page at {url} is not valid utf8"))?;
         let html = Html::parse_document(content);
 
-        // TODO: Nitter specific, do different things for libreddit
-        // TODO: Nitter videos are kinda bad, maybe skip them to begin with?
-        // TODO: save-to-mega can't really handle hls videos either way it seems like. webm works.
-        // TODO: Don't use og:image for libreddit since it's only a thumb.
-
-        let selector = Selector::parse(r#"meta[property="og:image"]"#)
-            .or_else(|e| Err(Error::msg(format!("Could not parse selector {e:?}"))))?;
-        let image_links = html.select(&selector).map(|element_ref| {
-            element_ref
-                .value()
-                .attr("content")
-                .ok_or_else(|| Error::msg("Missing content attribute for og:image property"))
-        });
+        let image_links = FeedTransformer::scrape_images_from_html(&url, html)?;
         let r: Result<Vec<Url>> = image_links
+            .into_iter()
             .map(|s| -> Result<Url> {
-                Url::try_from(s?)
+                Url::try_from(s?.as_str())
                     .with_context(|| format!("Invalid link {url} during image extraction."))
             })
             .collect();
         r
+    }
+
+    fn scrape_images_from_html(url: &Url, html: Html) -> Result<Vec<Result<String>>> {
+        // TODO: Nitter videos are kinda bad, maybe skip them to begin with?
+        // TODO: save-to-mega can't really handle hls videos either way it seems like. webm works.
+        // TODO: Don't use og:image for libreddit since it's only a thumb.
+        // TODO: Think about abstracting the common parts if there are more cases to handle in the future.
+        if url.to_string().contains("nitter") {
+            let selector = Selector::parse(r#"meta[property="og:image"]"#)
+                .or_else(|e| Err(Error::msg(format!("Could not parse selector {e:?}"))))?;
+            let image_links = html.select(&selector).map(|element_ref| {
+                element_ref
+                    .value()
+                    .attr("content")
+                    .map(|s| s.into())
+                    .ok_or_else(|| Error::msg("Missing content attribute for og:image property"))
+            });
+            Ok(image_links.collect())
+        } else {
+            let selector = Selector::parse(r#".post_media_image"#)
+                .or_else(|e| Err(Error::msg(format!("Could not parse selector {e:?}"))))?;
+            let image_links = html.select(&selector).map(|element_ref| {
+                element_ref
+                    .value()
+                    .attr("href")
+                    .map(|href| format!("https://libredd.it{href}"))
+                    .ok_or_else(|| Error::msg("Missing content attribute for og:image property"))
+            });
+            Ok(image_links.collect())
+        }
     }
 }
 
@@ -136,6 +155,21 @@ mod test {
         let transformer = transformer([(url.into(), Page("nitter_single_image"))].into());
         let feed = feed(vec![url]);
         let expected_url = "https://nitter.privacy.qvarford.net/pic/media%2FFY_ABU8XoAAoLX6.jpg";
+        let mut expected_feed = feed.clone();
+
+        let transformed_feed = transformer.extract_images_from_feed(feed).await;
+
+        expected_feed.entries[0].id = expected_url.into();
+        expected_feed.entries[0].link = expected_url.into();
+        assert_eq!(expected_feed, transformed_feed)
+    }
+
+    #[actix_rt::test]
+    async fn libreddit_single_image_is_extracted() {
+        let url = "https://libredd.it/r/AceAttorneyCirclejerk/comments/weucga/if_you_criticize_the_quality_of_the_judge_images/";
+        let transformer = transformer([(url.into(), Page("libreddit_single_image"))].into());
+        let feed = feed(vec![url]);
+        let expected_url = "https://libredd.it/img/yhra1yqisef91.jpg";
         let mut expected_feed = feed.clone();
 
         let transformed_feed = transformer.extract_images_from_feed(feed).await;
