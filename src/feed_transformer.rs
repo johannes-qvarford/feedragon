@@ -126,27 +126,8 @@ mod test {
     async fn nitter_single_image_is_extracted() {
         // map a serebii page
         let url = "https://nitter.privacy.qvarford.net/SerebiiNet/status/1554195261253046272";
-        let http_client = HashMapHttpClient {
-            hash_map: [(url.into(), Page("nitter_single_image"))].into(),
-        };
-        let transformer = FeedTransformer {
-            http_client: Rc::new(http_client),
-        };
-        let feed = Feed {
-            author_name: "".into(),
-            id: "".into(),
-            link: url.try_into().unwrap(),
-            title: "".into(),
-            entries: vec![Entry {
-                id: url.into(),
-                summary: "".into(),
-                title: "".into(),
-                link: url.into(),
-                updated: DateTime::parse_from_rfc3339("2022-03-22T07:26:01+00:00")
-                    .unwrap()
-                    .into(),
-            }],
-        };
+        let transformer = transformer([(url.into(), Page("nitter_single_image"))].into());
+        let feed = feed(vec![url]);
         let expected_url = "https://nitter.privacy.qvarford.net/pic/media%2FFY_ABU8XoAAoLX6.jpg";
         let mut expected_feed = feed.clone();
 
@@ -154,6 +135,52 @@ mod test {
 
         expected_feed.entries[0].id = expected_url.into();
         expected_feed.entries[0].link = expected_url.into();
+        assert_eq!(expected_feed, transformed_feed)
+    }
+
+    #[actix_rt::test]
+    async fn empty_if_there_are_no_images_to_extract() {
+        let url = "https://nitter.privacy.qvarford.net/jeremysmiles/status/1554270809509748737";
+        let transformer = transformer([(url.into(), Page("nitter_no_image"))].into());
+        let feed = feed(vec![url]);
+        let mut expected_feed = feed.clone();
+
+        let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
+
+        expected_feed.entries = vec![];
         assert_eq!(expected_feed, transformed_feed,)
+    }
+
+    #[actix_rt::test]
+    async fn empty_if_the_page_could_not_be_downloaded() {}
+
+    // empty_if_the_page_was_empty
+
+    fn transformer(page_map: HashMap<String, Page>) -> FeedTransformer {
+        let http_client = HashMapHttpClient { hash_map: page_map };
+        FeedTransformer {
+            http_client: Rc::new(http_client),
+        }
+    }
+
+    fn feed(ids: Vec<&'static str>) -> Feed {
+        Feed {
+            author_name: "".into(),
+            id: "".into(),
+            link: "https://google.com".try_into().unwrap(),
+            title: "".into(),
+            entries: ids
+                .into_iter()
+                .map(|id| Entry {
+                    id: id.into(),
+                    summary: "".into(),
+                    title: "".into(),
+                    link: id.into(),
+                    updated: DateTime::parse_from_rfc3339("2022-03-22T07:26:01+00:00")
+                        .unwrap()
+                        .into(),
+                })
+                .collect(),
+        }
     }
 }
