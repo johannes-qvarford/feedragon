@@ -132,7 +132,6 @@ mod test {
 
     #[actix_rt::test]
     async fn nitter_single_image_is_extracted() {
-        // map a serebii page
         let url = "https://nitter.privacy.qvarford.net/SerebiiNet/status/1554195261253046272";
         let transformer = transformer([(url.into(), Page("nitter_single_image"))].into());
         let feed = feed(vec![url]);
@@ -182,6 +181,22 @@ mod test {
         let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
 
         expected_feed.entries = vec![];
+        assert_eq!(expected_feed, transformed_feed)
+    }
+
+    #[actix_rt::test]
+    async fn images_from_second_entry_is_extracted_even_if_first_entry_is_invalid() {
+        let url = "https://nitter.privacy.qvarford.net/SerebiiNet/status/1554195261253046272";
+        let transformer = transformer([(url.into(), Page("nitter_single_image"))].into());
+        let feed = feed(vec!["https://invalid.com", url]);
+        let expected_url = "https://nitter.privacy.qvarford.net/pic/media%2FFY_ABU8XoAAoLX6.jpg";
+        let mut expected_feed = feed.clone();
+
+        let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
+
+        expected_feed.entries.remove(0);
+        expected_feed.entries[0].id = expected_url.into();
+        expected_feed.entries[0].link = expected_url.into();
         assert_eq!(expected_feed, transformed_feed)
     }
 
