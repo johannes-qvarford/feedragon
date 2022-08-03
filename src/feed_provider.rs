@@ -15,7 +15,7 @@ use url::Url;
 #[derive(Clone)]
 pub struct FeedProvider {
     categories: HashMap<String, Category>,
-    http_client: Rc<dyn HttpClient>,
+    pub http_client: Rc<dyn HttpClient>,
     feed_deserializer: Rc<dyn FeedDeserializer>,
 }
 

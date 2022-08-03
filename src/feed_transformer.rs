@@ -12,12 +12,12 @@ use log::warn;
 use reqwest::Url;
 use scraper::{Html, Selector};
 
-struct FeedTransformer {
-    http_client: Rc<dyn HttpClient>,
+pub struct FeedTransformer {
+    pub http_client: Rc<dyn HttpClient>,
 }
 
 impl FeedTransformer {
-    pub async fn extract_images_from_feed(&self, feed: Feed) -> Result<Feed> {
+    pub async fn extract_images_from_feed(&self, feed: Feed) -> Feed {
         let feed = feed;
         let stream = stream::iter(feed.entries).flat_map(|e| self.convert_to_image_entry(e));
 
@@ -28,13 +28,13 @@ impl FeedTransformer {
             .flatten()
             .collect();
 
-        Ok(Feed {
+        Feed {
             author_name: feed.author_name,
             id: feed.id,
             link: feed.link,
             title: feed.title,
             entries,
-        })
+        }
     }
 
     fn convert_to_image_entry(&self, e: Entry) -> impl Stream<Item = Vec<Entry>> + '_ {
@@ -138,7 +138,7 @@ mod test {
         let expected_url = "https://nitter.privacy.qvarford.net/pic/media%2FFY_ABU8XoAAoLX6.jpg";
         let mut expected_feed = feed.clone();
 
-        let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
+        let transformed_feed = transformer.extract_images_from_feed(feed).await;
 
         expected_feed.entries[0].id = expected_url.into();
         expected_feed.entries[0].link = expected_url.into();
@@ -152,7 +152,7 @@ mod test {
         let feed = feed(vec![url]);
         let mut expected_feed = feed.clone();
 
-        let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
+        let transformed_feed = transformer.extract_images_from_feed(feed).await;
 
         expected_feed.entries = vec![];
         assert_eq!(expected_feed, transformed_feed)
@@ -165,7 +165,7 @@ mod test {
         let feed = feed(vec![url]);
         let mut expected_feed = feed.clone();
 
-        let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
+        let transformed_feed = transformer.extract_images_from_feed(feed).await;
 
         expected_feed.entries = vec![];
         assert_eq!(expected_feed, transformed_feed)
@@ -178,7 +178,7 @@ mod test {
         let feed = feed(vec![url]);
         let mut expected_feed = feed.clone();
 
-        let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
+        let transformed_feed = transformer.extract_images_from_feed(feed).await;
 
         expected_feed.entries = vec![];
         assert_eq!(expected_feed, transformed_feed)
@@ -192,7 +192,7 @@ mod test {
         let expected_url = "https://nitter.privacy.qvarford.net/pic/media%2FFY_ABU8XoAAoLX6.jpg";
         let mut expected_feed = feed.clone();
 
-        let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
+        let transformed_feed = transformer.extract_images_from_feed(feed).await;
 
         expected_feed.entries.remove(0);
         expected_feed.entries[0].id = expected_url.into();
@@ -209,7 +209,7 @@ mod test {
         let expected_url2 = "https://nitter.privacy.qvarford.net/pic/media%2FFZNv6siWQAQ6A0t.jpg";
         let mut expected_feed = feed.clone();
 
-        let transformed_feed = transformer.extract_images_from_feed(feed).await.unwrap();
+        let transformed_feed = transformer.extract_images_from_feed(feed).await;
 
         expected_feed.entries.push(expected_feed.entries[0].clone());
         expected_feed.entries[0].id = expected_url1.into();

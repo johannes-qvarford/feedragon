@@ -1,10 +1,12 @@
 use crate::feed_provider::FeedProvider;
+use crate::feed_transformer::FeedTransformer;
 use actix_web::web::ServiceConfig;
 use actix_web::ResponseError;
 use actix_web::{get, web, App, HttpServer};
 use anyhow;
 use anyhow::{Context, Error, Result};
 use derive_more::Display;
+use serde_derive::Deserialize;
 
 #[derive(Display, Debug)]
 struct LoggingError {
@@ -24,9 +26,18 @@ impl From<Error> for LoggingError {
 async fn feed_category(
     info: web::Path<String>,
     state: web::Data<AppState>,
+    query: web::Query<Query>,
 ) -> Result<String, LoggingError> {
     let category_name = &info.into_inner();
     let feed = state.provider.feed_by_category(category_name).await?;
+    let feed = if query.extract.as_ref().filter(|e| **e == "media").is_some() {
+        let transformer = FeedTransformer {
+            http_client: state.provider.http_client.clone(),
+        };
+        transformer.extract_images_from_feed(feed).await
+    } else {
+        feed
+    };
     let response_body = feed.serialize_to_string().with_context(|| {
         format!(
             "Failed to convert feed category {} to string",
@@ -38,6 +49,11 @@ async fn feed_category(
 
 struct AppState {
     provider: FeedProvider,
+}
+
+#[derive(Deserialize)]
+struct Query {
+    extract: Option<String>,
 }
 
 pub async fn start_server<F: Clone + Send + 'static + Fn() -> FeedProvider>(
