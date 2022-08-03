@@ -9,7 +9,7 @@ env:
 jobs:
   publish:
     name: Feedragon
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     permissions:
       contents: read
       packages: write
