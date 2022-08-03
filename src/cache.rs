@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, hash::Hash};
 
-use anyhow::{Context, Error, Result};
+use anyhow::{Context, Result};
 use chrono::Utc;
 use futures::Future;
 use log::warn;
@@ -13,20 +13,24 @@ pub struct CacheEntry<V: Send> {
 
 pub struct TimedCache<K, V: Send> {
     expiration_duration: chrono::Duration,
-    entries: HashMap<K, RefCell<Option<CacheEntry<V>>>>,
+    // TODO: Investigate if we need the inner RefCell
+    entries: RefCell<HashMap<K, CacheEntry<V>>>,
 }
 
 impl<V: Clone + Send> TimedCache<String, V> {}
 
-impl<K: Eq + Hash + std::fmt::Debug, V: Clone + Send + std::fmt::Debug> TimedCache<K, V> {
+impl<K: Clone + Eq + Hash + std::fmt::Debug + ToString, V: Clone + Send + std::fmt::Debug>
+    TimedCache<K, V>
+{
     pub fn from_expiration_duration_and_keys<I: Iterator<Item = K>>(
         duration: chrono::Duration,
-        keys: I,
+        _keys: I,
     ) -> TimedCache<K, V> {
-        let hash_map = keys.map(|name| (name, RefCell::new(None))).collect();
+        // TODO: We don't need to pre-fill the map anymore. Also, the size of the map can grow unbounded currently.
+        // Will have to remove expired entries on a schedule, and not just their values on request.
         TimedCache {
             expiration_duration: duration,
-            entries: hash_map,
+            entries: RefCell::new(HashMap::new()),
         }
     }
 
@@ -35,45 +39,38 @@ impl<K: Eq + Hash + std::fmt::Debug, V: Clone + Send + std::fmt::Debug> TimedCac
         F: FnOnce() -> Fut,
         Fut: Future<Output = Result<V>>,
     {
-        let new_entry_option = self.entries.get(&key);
+        let entries = self.entries.borrow();
+        let value = entries.get(&key).map(|v| v.clone());
+        drop(entries);
 
-        match new_entry_option {
-            None => {
-                warn!("Key is missing from cache: {:?}", key);
-                Err(Error::msg("Key is missing from cache: {key}"))
+        match value {
+            Some(entry) => {
+                if entry.expiration_date_time.timestamp() > chrono::offset::Utc::now().timestamp() {
+                    Ok(entry.value.clone())
+                } else {
+                    let result = f().await;
+                    if let Ok(new_value) = result {
+                        let entry = self.new_cache_entry(new_value.clone());
+                        let mut entries = self.entries.borrow_mut();
+                        entries.insert(key.clone(), entry);
+                        Ok(new_value)
+                    } else {
+                        warn!("Failed to compute a new value after expiration. The previous value was used instead.");
+                        Ok(entry.value.clone())
+                    }
+                }
             }
-            Some(new_entry) => {
-                let mut borrow = new_entry.borrow_mut();
-                match borrow.as_ref() {
-                    Some(entry) => {
-                        if entry.expiration_date_time.timestamp()
-                            > chrono::offset::Utc::now().timestamp()
-                        {
-                            Ok(entry.value.clone())
-                        } else {
-                            let result = f().await;
-                            if let Ok(new_value) = result {
-                                let entry = Some(self.new_cache_entry(new_value.clone()));
-                                *borrow = entry;
-                                Ok(new_value)
-                            } else {
-                                warn!("Failed to compute a new value after expiration. The previous value was used instead.");
-                                Ok(entry.value.clone())
-                            }
-                        }
-                    }
-                    _ => {
-                        let result = f().await;
+            _ => {
+                let result = f().await;
 
-                        match &result {
-                            Ok(value) => {
-                                let entry = Some(self.new_cache_entry(value.clone()));
-                                *borrow = entry;
-                                result
-                            }
-                            Err(_) => result.context("Failed to compute a successful response when there was nothing cached to use."),
-                        }
+                match &result {
+                    Ok(value) => {
+                        let entry = self.new_cache_entry(value.clone());
+                        let mut entries = self.entries.borrow_mut();
+                        entries.insert(key.clone(), entry);
+                        result
                     }
+                    Err(_) => result.context("Failed to compute a successful response when there was nothing cached to use."),
                 }
             }
         }

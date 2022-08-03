@@ -27,6 +27,7 @@ fn thread_local_feed_provider(config: Arc<Config>) -> FeedProvider {
         .iter()
         .flat_map(|(_, url_strings)| url_strings)
         .map(|s| Url::parse(s).unwrap());
+
     let http_client =
         CachingHttpClient::new(Rc::new(http_client), chrono::Duration::hours(1), feed_urls);
     let http_client = Rc::new(http_client);

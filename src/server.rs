@@ -62,6 +62,7 @@ pub async fn start_server<F: Clone + Send + 'static + Fn() -> FeedProvider>(
 ) -> std::io::Result<()> {
     HttpServer::new(move || App::new().configure(config_app(factory())))
         .bind(("0.0.0.0", port))?
+        .workers(1)
         .run()
         .await
 }

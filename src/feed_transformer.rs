@@ -96,15 +96,23 @@ impl FeedTransformer {
             });
             Ok(image_links.collect())
         } else {
-            let selector = Selector::parse(r#".post_media_image"#)
+            let single_image_selector = Selector::parse(r#".post_media_image"#)
                 .or_else(|e| Err(Error::msg(format!("Could not parse selector {e:?}"))))?;
-            let image_links = html.select(&selector).map(|element_ref| {
-                element_ref
-                    .value()
-                    .attr("href")
-                    .map(|href| format!("https://libredd.it{href}"))
-                    .ok_or_else(|| Error::msg("Missing content attribute for og:image property"))
-            });
+            let multiple_image_selector = Selector::parse(r#".gallery a"#)
+                .or_else(|e| Err(Error::msg(format!("Could not parse selector {e:?}"))))?;
+
+            let image_links = html
+                .select(&single_image_selector)
+                .chain(html.select(&multiple_image_selector))
+                .map(|element_ref| {
+                    element_ref
+                        .value()
+                        .attr("href")
+                        .map(|href| format!("https://libredd.it{href}"))
+                        .ok_or_else(|| {
+                            Error::msg("Missing content attribute for og:image property")
+                        })
+                });
             Ok(image_links.collect())
         }
     }
@@ -235,12 +243,31 @@ mod test {
     }
 
     #[actix_rt::test]
-    async fn multiple_images_can_be_extracted() {
+    async fn nitter_multiple_images_can_be_extracted() {
         let url = "https://nitter.privacy.qvarford.net/SerebiiNet/status/1554709371459981313";
         let transformer = transformer([(url.into(), Page("nitter_two_images"))].into());
         let feed = feed(vec![url]);
         let expected_url1 = "https://nitter.privacy.qvarford.net/pic/media%2FFZNv5wmXgAE5UOB.jpg";
         let expected_url2 = "https://nitter.privacy.qvarford.net/pic/media%2FFZNv6siWQAQ6A0t.jpg";
+        let mut expected_feed = feed.clone();
+
+        let transformed_feed = transformer.extract_images_from_feed(feed).await;
+
+        expected_feed.entries.push(expected_feed.entries[0].clone());
+        expected_feed.entries[0].id = expected_url1.into();
+        expected_feed.entries[0].link = expected_url1.into();
+        expected_feed.entries[1].id = expected_url2.into();
+        expected_feed.entries[1].link = expected_url2.into();
+        assert_eq!(expected_feed, transformed_feed)
+    }
+
+    #[actix_rt::test]
+    async fn libreddit_multiple_images_can_be_extracted() {
+        let url = "https://libredd.it/r/AnarchyChess/comments/wf2945/new_response_just_dropped/";
+        let transformer = transformer([(url.into(), Page("libreddit_two_images"))].into());
+        let feed = feed(vec![url]);
+        let expected_url1 = "https://libredd.it/preview/pre/0kv9uvdzygf91.png?width=760&format=png&auto=webp&s=31bb239d520a7583e84530468937786fec56ab2e";
+        let expected_url2 = "https://libredd.it/preview/pre/cvu0eyozygf91.png?width=1080&format=png&auto=webp&s=e9b8493c7030734c343c3d5fca1d7b9b9002c12a";
         let mut expected_feed = feed.clone();
 
         let transformed_feed = transformer.extract_images_from_feed(feed).await;
