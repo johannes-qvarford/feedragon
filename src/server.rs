@@ -67,7 +67,7 @@ struct ExternalPreviewPath {
 async fn libreddit_redirect(info: web::Path<ExternalPreviewPath>) -> impl Responder {
     let tail = &info.tail;
     let query = String::from_utf8(base64::decode(&info.query_base64).unwrap()).unwrap();
-    let value = format!("https://libredd.it/{tail}?{query}");
+    let value = format!("https://libreddit.privacy.qvarford.net/{tail}?{query}");
     HttpResponse::SeeOther()
         .append_header((header::LOCATION, value))
         .finish()

@@ -112,7 +112,7 @@ impl FeedTransformer {
                     element_ref
                         .value()
                         .attr("href")
-                        .map(|href| format!("https://libredd.it{href}"))
+                        .map(|href| format!("https://libreddit.privacy.qvarford.net{href}"))
                         // TODO: Use a custom website to browse images that can handle image urls with query parameters.
                         .map(|href| {
                             if href.contains("preview/external-pre") {
@@ -191,10 +191,10 @@ mod test {
 
     #[actix_rt::test]
     async fn libreddit_single_image_is_extracted() {
-        let url = "https://libredd.it/r/AceAttorneyCirclejerk/comments/weucga/if_you_criticize_the_quality_of_the_judge_images/";
+        let url = "https://libreddit.privacy.qvarford.net/r/AceAttorneyCirclejerk/comments/weucga/if_you_criticize_the_quality_of_the_judge_images/";
         let transformer = transformer([(url.into(), Page("libreddit_single_image"))].into());
         let feed = feed(vec![url]);
-        let expected_url = "https://libredd.it/img/yhra1yqisef91.jpg";
+        let expected_url = "https://libreddit.privacy.qvarford.net/img/yhra1yqisef91.jpg";
         let mut expected_feed = feed.clone();
 
         let transformed_feed = transformer.extract_images_from_feed(feed).await;
@@ -295,11 +295,11 @@ mod test {
 
     #[actix_rt::test]
     async fn libreddit_multiple_images_can_be_extracted() {
-        let url = "https://libredd.it/r/AnarchyChess/comments/wf2945/new_response_just_dropped/";
+        let url = "https://libreddit.privacy.qvarford.net/r/AnarchyChess/comments/wf2945/new_response_just_dropped/";
         let transformer = transformer([(url.into(), Page("libreddit_two_images"))].into());
         let feed = feed(vec![url]);
-        let expected_url1 = "https://libredd.it/img/0kv9uvdzygf91.png";
-        let expected_url2 = "https://libredd.it/img/cvu0eyozygf91.png";
+        let expected_url1 = "https://libreddit.privacy.qvarford.net/img/0kv9uvdzygf91.png";
+        let expected_url2 = "https://libreddit.privacy.qvarford.net/img/cvu0eyozygf91.png";
         let mut expected_feed = feed.clone();
 
         let transformed_feed = transformer.extract_images_from_feed(feed).await;
