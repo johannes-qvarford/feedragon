@@ -48,6 +48,10 @@ impl FeedTransformer {
             }
             Ok(links) => links
                 .into_iter()
+                .map(|mut url| {
+                    url.set_query(None);
+                    url
+                })
                 .map(|link| Entry {
                     id: link.to_string(),
                     link: link.to_string(),
@@ -109,6 +113,7 @@ impl FeedTransformer {
                         .value()
                         .attr("href")
                         .map(|href| format!("https://libredd.it{href}"))
+                        .map(|href| href.replace("preview/pre", "img"))
                         .ok_or_else(|| {
                             Error::msg("Missing content attribute for og:image property")
                         })
@@ -266,8 +271,8 @@ mod test {
         let url = "https://libredd.it/r/AnarchyChess/comments/wf2945/new_response_just_dropped/";
         let transformer = transformer([(url.into(), Page("libreddit_two_images"))].into());
         let feed = feed(vec![url]);
-        let expected_url1 = "https://libredd.it/preview/pre/0kv9uvdzygf91.png?width=760&format=png&auto=webp&s=31bb239d520a7583e84530468937786fec56ab2e";
-        let expected_url2 = "https://libredd.it/preview/pre/cvu0eyozygf91.png?width=1080&format=png&auto=webp&s=e9b8493c7030734c343c3d5fca1d7b9b9002c12a";
+        let expected_url1 = "https://libredd.it/img/0kv9uvdzygf91.png";
+        let expected_url2 = "https://libredd.it/img/cvu0eyozygf91.png";
         let mut expected_feed = feed.clone();
 
         let transformed_feed = transformer.extract_images_from_feed(feed).await;
