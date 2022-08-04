@@ -1,8 +1,9 @@
 use crate::feed_provider::FeedProvider;
 use crate::feed_transformer::FeedTransformer;
+use actix_web::http::header;
 use actix_web::web::ServiceConfig;
-use actix_web::ResponseError;
-use actix_web::{get, web, App, HttpServer};
+use actix_web::{get, web, App, HttpResponse, HttpServer};
+use actix_web::{Responder, ResponseError};
 use anyhow;
 use anyhow::{Context, Error, Result};
 use derive_more::Display;
@@ -20,6 +21,15 @@ impl From<Error> for LoggingError {
         log::error!("{:#?}", err);
         LoggingError { err }
     }
+}
+
+struct AppState {
+    provider: FeedProvider,
+}
+
+#[derive(Deserialize)]
+struct Query {
+    extract: Option<String>,
 }
 
 #[get("/feeds/{name}/atom.xml")]
@@ -47,13 +57,20 @@ async fn feed_category(
     Ok(response_body)
 }
 
-struct AppState {
-    provider: FeedProvider,
+#[derive(Deserialize)]
+struct ExternalPreviewPath {
+    query_base64: String,
+    tail: String,
 }
 
-#[derive(Deserialize)]
-struct Query {
-    extract: Option<String>,
+#[get("/libreddit/ep/{query_base64}/{tail:.*}")]
+async fn libreddit_redirect(info: web::Path<ExternalPreviewPath>) -> impl Responder {
+    let tail = &info.tail;
+    let query = String::from_utf8(base64::decode(&info.query_base64).unwrap()).unwrap();
+    let value = format!("https://libredd.it/{tail}?{query}");
+    HttpResponse::SeeOther()
+        .append_header((header::LOCATION, value))
+        .finish()
 }
 
 pub async fn start_server<F: Clone + Send + 'static + Fn() -> FeedProvider>(
@@ -72,7 +89,8 @@ fn config_app(provider: FeedProvider) -> Box<dyn Fn(&mut ServiceConfig)> {
         cfg.app_data(web::Data::new(AppState {
             provider: provider.clone(),
         }))
-        .service(feed_category);
+        .service(feed_category)
+        .service(libreddit_redirect);
         ()
     })
 }

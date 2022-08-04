@@ -114,7 +114,17 @@ impl FeedTransformer {
                         .attr("href")
                         .map(|href| format!("https://libredd.it{href}"))
                         // TODO: Use a custom website to browse images that can handle image urls with query parameters.
-                        .filter(|href| !href.contains("preview/external-pre"))
+                        .map(|href| {
+                            if href.contains("preview/external-pre") {
+                                let url = Url::try_from(href.as_str()).unwrap();
+                                let query =
+                                    url.query().map(|q| base64::encode(q)).unwrap_or_default();
+                                let path = url.path();
+                                format!("https://feedragon.privacy.qvarford.net/libreddit/ep/{query}{path}")
+                            } else {
+                                href
+                            }
+                        })
                         .map(|href| href.replace("preview/pre", "img"))
                         .ok_or_else(|| {
                             Error::msg("Missing content attribute for og:image property")
@@ -185,6 +195,21 @@ mod test {
         let transformer = transformer([(url.into(), Page("libreddit_single_image"))].into());
         let feed = feed(vec![url]);
         let expected_url = "https://libredd.it/img/yhra1yqisef91.jpg";
+        let mut expected_feed = feed.clone();
+
+        let transformed_feed = transformer.extract_images_from_feed(feed).await;
+
+        expected_feed.entries[0].id = expected_url.into();
+        expected_feed.entries[0].link = expected_url.into();
+        assert_eq!(expected_feed, transformed_feed)
+    }
+
+    #[actix_rt::test]
+    async fn libreddit_external_images_are_proxied() {
+        let url = "https://www.reddit.com/r/AceAttorneyCirclejerk/comments/wev5mg/facts/";
+        let transformer = transformer([(url.into(), Page("libreddit_external_image"))].into());
+        let feed = feed(vec![url]);
+        let expected_url = "https://feedragon.privacy.qvarford.net/libreddit/ep/YXV0bz13ZWJwJnM9Y2RkMTljYWE3YzBhMGZiYjg1Yzk2OTk1OTVmZTdmYTRhYjliZDkyNQ==/preview/external-pre/89qweeQXjTSRVVKQhcu-mgN2RRQHr7HM1wenvITkRCo.jpg";
         let mut expected_feed = feed.clone();
 
         let transformed_feed = transformer.extract_images_from_feed(feed).await;

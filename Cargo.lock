@@ -562,6 +562,7 @@ dependencies = [
  "actix-web",
  "anyhow",
  "async-trait",
+ "base64",
  "bytes",
  "chrono",
  "derive-alias",
