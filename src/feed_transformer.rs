@@ -113,6 +113,8 @@ impl FeedTransformer {
                         .value()
                         .attr("href")
                         .map(|href| format!("https://libredd.it{href}"))
+                        // TODO: Use a custom website to browse images that can handle image urls with query parameters.
+                        .filter(|href| !href.contains("preview/external-pre"))
                         .map(|href| href.replace("preview/pre", "img"))
                         .ok_or_else(|| {
                             Error::msg("Missing content attribute for og:image property")
